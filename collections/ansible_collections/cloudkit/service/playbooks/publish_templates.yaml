@@ -17,13 +17,11 @@
           - "cloudkit_template_collections: {{ cloudkit_template_collections }}"
 
     - name: Get client token
-      ansible.builtin.command:
-        cmd: >
-          oc create token -n {{ publish_templates_namespace }}
-          {{ publish_templates_service_account }}
-          --duration=10m
+      cloudkit.service.client_token:
+        service_account: "{{ publish_templates_service_account }}"
+        namespace: "{{ publish_templates_namespace }}"
+        duration: 10m
       register: fulfillment_service_client_token
-      changed_when: false
 
     - name: Discover templates
       ansible.builtin.include_role:
@@ -41,4 +39,4 @@
       ansible.builtin.include_role:
         name: cloudkit.service.publish_templates
       vars:
-        cloudkit_fulfillment_service_token: "{{ fulfillment_service_client_token.stdout }}"
+        cloudkit_fulfillment_service_token: "{{ fulfillment_service_client_token.token }}"
