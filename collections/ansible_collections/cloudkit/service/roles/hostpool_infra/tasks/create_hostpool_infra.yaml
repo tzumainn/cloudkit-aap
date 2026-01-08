@@ -99,7 +99,7 @@
     name: manage_hosts
     tasks_from: add_host_to_fulfillment_service
   vars:
-    manage_hosts_fulfillment_service_token: "{{ fulfillment_service_client_token }}"
+    manage_hosts_fulfillment_service_token: "{{ fulfillment_service_client_token.stdout }}"
     manage_hosts_validate_certs: "{{ hostpool_infra_validate_certs | default(true) | bool }}"
     manage_hosts_host_name: "{{ item.name }}"
     manage_hosts_hostpool_uid: "{{ hostpool_infra_uid }}"
