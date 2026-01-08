@@ -4,55 +4,61 @@ DOCUMENTATION = r'''
 ---
 module: node_network
 short_description: Attaches/detaches networks to/from a baremetal node
-author: Innabox
 description:
   - Attach or detach Neutron networks to or from an Ironic node
+  - When state is present, attaches the specified networks to the node
+  - When state is absent with networks specified, detaches those specific networks
+  - When state is absent with no networks specified, detaches all networks
 options:
-  mac_address:
+  networks:
     description:
-      - The MAC address of the baremetal port
-    type: str
-  network:
-    description:
-      - The name or ID of the network to attach or detach
-    type: str
+      - List of network names or IDs to attach or detach
+      - Required when state is present
+      - Optional when state is absent (if not specified, all networks are detached)
+    type: list
+    elements: str
   node:
     description:
       - The name or ID of the node
     required: true
     type: str
-  port:
-    description:
-      - The name or ID of the vif to attach or detach
-    type: str
   state:
     description:
-      - Indicates whether the attachment should be present or absent
+      - Indicates whether the networks should be present or absent
     choices: ['present', 'absent']
     default: present
-    type: str
-  trunk:
-    description:
-      - The name or ID of the trunk to attach or detach its parent port
     type: str
 extends_documentation_fragment:
   - openstack.cloud.openstack
 '''
 
 EXAMPLES = r'''
-- name: Attach a network to a node
+- name: Attach a single network to a node
   massopencloud.esi.node_network:
     cloud: "devstack"
     state: "present"
     node: "MOC-R4PAC67U12-S3"
-    network: "hypershift"
+    networks:
+      - "hypershift"
 
-- name: Detach a network from a node
+- name: Attach multiple networks to a node
+  massopencloud.esi.node_network:
+    cloud: "devstack"
+    state: "present"
+    node: "MOC-R4PAC67U12-S3"
+    networks:
+      - "hypershift"
+      - "provisioning"
+      - "storage"
+
+- name: Detach specific networks from a node
   massopencloud.esi.node_network:
     cloud: "devstack"
     state: "absent"
     node: "MOC-R4PAC67U12-S3"
-    network: "hypershift"
+    networks:
+      - "hypershift"
+      - "old-network"
 
 - name: Detach all networks from a node
   massopencloud.esi.node_network:
@@ -68,66 +74,67 @@ from ansible_collections.openstack.cloud.plugins.module_utils.openstack import (
 
 class NodeNetworkModule(OpenStackModule):
     argument_spec = dict(
-        mac_address=dict(),
-        network=dict(),
+        networks=dict(type='list', elements='str'),
         node=dict(required=True),
-        port=dict(),
         state=dict(default='present', choices=['present', 'absent']),
-        trunk=dict(),
     )
     module_kwargs = dict(
         required_if=[
-            ['state', 'present', ['network', 'port', 'trunk'], True],
-        ],
-        mutually_exclusive=[
-            ['network', 'port', 'trunk'],
+            ['state', 'present', ['networks']],
         ],
     )
 
     def run(self):
         node = self.conn.baremetal.find_node(self.params['node'],
                                              ignore_missing=False)
-        mac_address = self.params['mac_address']
-        network = self.params['network']
-        port = self.params['port']
-        trunk = self.params['trunk']
+        networks = self.params['networks'] or []
 
-        network_port = self._find_or_create_network_port(node.name, network,
-                                                         port, trunk)
         baremetal_ports = list(self.conn.baremetal.ports(
-            details=True, node_id=node.id, address=mac_address))
+            details=True, node_id=node.id))
 
         changed = False
+
         if self.params['state'] == 'present':
-            baremetal_port = self._find_matching_baremetal_port(
-                baremetal_ports, network_port, mac_address)
-            if baremetal_port:
-                self.exit_json(changed=changed)
+            for network_name in networks:
+                network_port = self._find_or_create_network_port(
+                    node.name, network_name)
 
-            baremetal_port = self._find_free_baremetal_port(
-                baremetal_ports, mac_address)
-            if not baremetal_port:
-                self.fail_json(msg='Node %s has no free ports' % node.id)
+                baremetal_port = self._find_matching_baremetal_port(
+                    baremetal_ports, network_port)
+                if baremetal_port:
+                    continue
 
-            self.conn.baremetal.attach_vif_to_node(
-                node, network_port.id, port_id=baremetal_port.id)
-            changed = True
+                baremetal_port = self._find_free_baremetal_port(baremetal_ports)
+                if not baremetal_port:
+                    self.fail_json(msg='Node %s has no free ports \
+                        for network %s' % (node.id, network_name))
+
+                self.conn.baremetal.attach_vif_to_node(
+                    node, network_port.id, port_id=baremetal_port.id)
+                changed = True
 
         elif self.params['state'] == 'absent':
-            if network or port or trunk:
-                baremetal_port = self._find_matching_baremetal_port(
-                    baremetal_ports, network_port, mac_address)
-                if baremetal_port:
-                    self.conn.baremetal.detach_vif_from_node(
-                        node, network_port.id)
-                    changed = True
+            if networks:
+                for network_name in networks:
+                    network_port = self._find_or_create_network_port(
+                        node.name, network_name)
+                    if not network_port:
+                        continue
+
+                    baremetal_port = self._find_matching_baremetal_port(
+                        baremetal_ports, network_port)
+                    if baremetal_port:
+                        self.conn.baremetal.detach_vif_from_node(
+                            node, network_port.id)
+                        self.conn.network.delete_port(network_port.id)
+                        changed = True
             else:
                 for bp in baremetal_ports:
-                    if mac_address and bp.address != mac_address:
-                        continue
                     if 'tenant_vif_port_id' in bp.internal_info:
                         self.conn.baremetal.detach_vif_from_node(
                             node, bp.internal_info['tenant_vif_port_id'])
+                        self.conn.network.delete_port(
+                            bp.internal_info['tenant_vif_port_id'])
                         changed = True
 
         else:
@@ -136,53 +143,35 @@ class NodeNetworkModule(OpenStackModule):
 
         self.exit_json(changed=changed)
 
-    def _find_or_create_network_port(self, node_name, network,
-                                     network_port, trunk):
-        port = None
+    def _find_or_create_network_port(self, node_name, network):
+        network = self.conn.network.find_network(network, ignore_missing=False)
+        port_name = "%s-%s" % (node_name, network.name)
+        existing_ports = list(self.conn.network.ports(name=port_name))
 
-        if network:
-            network = self.conn.network.find_network(
-                network, ignore_missing=False)
-            port_name = "%s-%s" % (node_name, network.name)
-            existing_ports = list(self.conn.network.ports(name=port_name))
-            if existing_ports:
-                port = existing_ports[0]
-            elif self.params['state'] == 'present':
-                port = self.conn.network.create_port(
-                    name=port_name,
-                    network_id=network.id,
-                    device_owner='baremetal:none'
-                )
+        if existing_ports:
+            return existing_ports[0]
 
-        elif network_port:
-            port = self.conn.network.find_port(
-                network_port, ignore_missing=False)
+        elif self.params['state'] == 'present':
+            return self.conn.network.create_port(
+                name=port_name,
+                network_id=network.id,
+                device_owner='baremetal:none'
+            )
 
-        elif trunk:
-            trunk_network = self.conn.network.find_trunk(
-                trunk, ignore_missing=False)
-            port = self.conn.network.find_port(
-                trunk_network.port_id, ignore_missing=False)
+        return None
 
-        return port
-
-    def _find_matching_baremetal_port(self, baremetal_ports,
-                                      network_port, mac_address):
+    def _find_matching_baremetal_port(self, baremetal_ports, network_port):
         if network_port is None:
             return None
 
         for bp in baremetal_ports:
-            if mac_address and bp.address != mac_address:
-                continue
             if bp.internal_info.get('tenant_vif_port_id') == network_port.id:
                 return bp
 
         return None
 
-    def _find_free_baremetal_port(self, baremetal_ports, mac_address):
+    def _find_free_baremetal_port(self, baremetal_ports):
         for bp in baremetal_ports:
-            if mac_address and bp.address != mac_address:
-                continue
             if "tenant_vif_port_id" not in bp.internal_info:
                 return bp
 
