@@ -86,20 +86,18 @@
   loop: "{{ host_list }}"
 
 - name: Get client token
-  ansible.builtin.command:
-    cmd: >
-      oc create token -n {{ lookup('env', 'POD_NAMESPACE') }}
-      fulfillment-admin
-      --duration=10m
+  cloudkit.service.client_token:
+    service_account: fulfillment-admin
+    namespace: "{{ lookup('env', 'POD_NAMESPACE') }}"
+    duration: 10m
   register: fulfillment_service_client_token
-  changed_when: false
 
 - name: Create hosts in fulfillment service
   ansible.builtin.include_role:
     name: manage_hosts
     tasks_from: add_host_to_fulfillment_service
   vars:
-    manage_hosts_fulfillment_service_token: "{{ fulfillment_service_client_token.stdout }}"
+    manage_hosts_fulfillment_service_token: "{{ fulfillment_service_client_token.token }}"
     manage_hosts_validate_certs: "{{ hostpool_infra_validate_certs | default(true) | bool }}"
     manage_hosts_host_name: "{{ item.name }}"
     manage_hosts_hostpool_uid: "{{ hostpool_infra_uid }}"
