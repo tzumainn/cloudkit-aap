@@ -59,14 +59,14 @@ Deploy virtual machines on OpenShift Virtualization with automated floating IP a
 - name: Deploy a virtual machine
   hosts: localhost
   tasks:
-    - name: Create VM
+    - name: Create ComputeInstance
       ansible.builtin.include_role:
         name: osac.massopencloud.ocp_virt_vm
         tasks_from: create
       vars:
-        vm_order:
+        compute_instance:
           metadata:
-            name: my-vm
+            name: my-compute-instance
             namespace: default
         template_parameters:
           cpu_cores: 4
