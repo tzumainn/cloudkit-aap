@@ -1,0 +1,46 @@
+- name: Show host CRD values
+  ansible.builtin.debug:
+    var: manage_hosts_host_crd
+
+- name: Set expected host power state
+  ansible.builtin.set_fact:
+    target_host_power_state: "{{ manage_hosts_host_crd.spec.powerState }}"
+
+- name: Show expected host power state
+  ansible.builtin.debug:
+    var: target_host_power_state
+
+- name: Get host information
+  ansible.builtin.include_role:
+    name: massopencloud.esi.host
+    tasks_from: get_host
+  vars:
+    host_uid: "{{ manage_hosts_host_crd.metadata.labels['cloudkit.openshift.io/host-uuid'] }}"
+
+- name: Show host information
+  ansible.builtin.debug:
+    var: host
+
+- name: Power state unspecified; update CRD to current host power state
+  when: target_host_power_state not in ('HOST_POWER_STATE_ON', 'HOST_POWER_STATE_OFF')
+  kubernetes.core.k8s_json_patch:
+    api_version: "{{ manage_hosts_host_crd.apiVersion }}"
+    kind: "{{ manage_hosts_host_crd.kind }}"
+    namespace: "{{ manage_hosts_host_crd.metadata.namespace }}"
+    name: "{{ manage_hosts_host_crd.metadata.name }}"
+    patch:
+      - op: replace
+        path: /spec/powerState
+        value: "{{ host.power_state }}"
+      - op: replace
+        path: /status/powerState
+        value: "{{ host.power_state }}"
+
+- name: Power state specified; update host to current host power state
+  when: target_host_power_state in ('HOST_POWER_STATE_ON', 'HOST_POWER_STATE_OFF')
+  ansible.builtin.include_role:
+    name: massopencloud.esi.host
+    tasks_from: sync_host_power_state
+  vars:
+    host_uid: "{{ manage_hosts_host_crd.metadata.labels['cloudkit.openshift.io/host-uuid'] }}"
+    host_target_power_state: "{{ target_host_power_state }}"

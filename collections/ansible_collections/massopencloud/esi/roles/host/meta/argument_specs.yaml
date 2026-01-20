@@ -25,6 +25,12 @@ argument_specs:
         description: Host name
         type: "str"
         required: true
+  get_host:
+    options:
+      host_uid:
+        description: Host UID
+        type: "str"
+        required: true
   list_hosts:
     options:
       host_class:
@@ -45,5 +51,15 @@ argument_specs:
     options:
       host_name:
         description: Host to remove from hostpool
+        type: "str"
+        required: true
+  sync_host_power_state:
+    options:
+      host_uid:
+        description: Host UID
+        type: "str"
+        required: true
+      host_target_power_state:
+        description: Target power state
         type: "str"
         required: true

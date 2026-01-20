@@ -1,0 +1,38 @@
+---
+- name: Teardown host infrastructure from a Host
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    host: "{{ ansible_eda.event.payload }}"
+    cloudkit_fulfillment_service_uri: "{{ lookup('env', 'CLOUDKIT_FULFILLMENT_SERVICE_URI', default='https://fulfillment-api:8000') }}"
+
+  pre_tasks:
+    - name: Show host values
+      ansible.builtin.debug:
+        var: host
+
+  tasks:
+    - name: Remove infrastructure finalizer
+      ansible.builtin.include_role:
+        name: cloudkit.service.finalizer
+      vars:
+        finalizer_state: absent
+        finalizer_name: "{{ hostpool_infrastructure_finalizer }}"
+        finalizer_target:
+          api_version: "{{ item.api_version }}"
+          kind: "{{ item.kind }}"
+          namespace: "{{ item.namespace | default(omit) }}"
+          name: "{{ item.name }}"
+      loop:
+        - api_version: cloudkit.openshift.io/v1alpha1
+          kind: Host
+          namespace: "{{ lookup('env', 'POD_NAMESPACE') }}"
+          name: "{{ hostpool.metadata.name }}"
+
+    - name: Clean hosts
+      ansible.builtin.include_role:
+        name: massopencloud.esi.host
+        tasks_from: clean_host
+      vars:
+        host_name: "{{ host.metadata.labels['cloudkit.openshift.io/host-uuid'] }}"

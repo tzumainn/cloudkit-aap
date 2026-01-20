@@ -178,6 +178,58 @@ controller_templates: # noqa: var-naming[no-role-prefix]
     verbosity: 0
     extra_vars:
       workflow_status: failed
+  - name: "{{ aap_prefix }}-create-host"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_create_host.yml"
+    inventory: "{{ aap_prefix }}-host-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-host-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
+  - name: "{{ aap_prefix }}-delete-host"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_delete_host.yml"
+    inventory: "{{ aap_prefix }}-host-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-host-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
+  - name: "{{ aap_prefix }}-report-host-status-success"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_report_host_status.yml"
+    inventory: "{{ aap_prefix }}-host-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-host-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
+    extra_vars:
+      workflow_status: succeeded
+  - name: "{{ aap_prefix }}-report-host-status-failure"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_report_host_status.yml"
+    inventory: "{{ aap_prefix }}-host-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-host-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
+    extra_vars:
+      workflow_status: failed
 
 controller_job_template_surveys: # noqa: var-naming[no-role-prefix]
   - name: "{{ aap_prefix }}-create-hosted-cluster-post-install"
@@ -197,7 +249,7 @@ controller_job_template_surveys: # noqa: var-naming[no-role-prefix]
           new_question: true
           secret: true
 
-# Create workflows for cluster and hostpool management
+# Create workflows for cluster and host management
 controller_workflows: # noqa: var-naming[no-role-prefix]
   - name: "{{ aap_prefix }}-create-hosted-cluster-workflow"
     description: "Workflow for creating hosted cluster"
@@ -312,6 +364,58 @@ controller_workflows: # noqa: var-naming[no-role-prefix]
         unified_job_template:
           name: "{{ aap_prefix }}-report-hostpool-status-failure"
           type: job_template
+  - name: "{{ aap_prefix }}-create-host-workflow"
+    description: "Workflow for creating host"
+    organization: "{{ aap_organization_name }}"
+    ask_variables_on_launch: true
+    inventory: "{{ aap_prefix }}-host-operations"
+    allow_simultaneous: true
+    extra_vars:
+      workflow_name: create-host
+    workflow_nodes:
+      - identifier: "create"
+        unified_job_template:
+          name: "{{ aap_prefix }}-create-host"
+          type: job_template
+        related:
+          success_nodes:
+            - identifier: "report-host-status-success"
+          failure_nodes:
+            - identifier: "report-host-status-failure"
+      - identifier: "report-host-status-success"
+        unified_job_template:
+          name: "{{ aap_prefix }}-report-host-status-success"
+          type: job_template
+      - identifier: "report-host-status-failure"
+        unified_job_template:
+          name: "{{ aap_prefix }}-report-host-status-failure"
+          type: job_template
+  - name: "{{ aap_prefix }}-delete-host-workflow"
+    description: "Workflow for deleting host"
+    organization: "{{ aap_organization_name }}"
+    ask_variables_on_launch: true
+    inventory: "{{ aap_prefix }}-host-operations"
+    allow_simultaneous: true
+    extra_vars:
+      workflow_name: delete-host
+    workflow_nodes:
+      - identifier: "delete"
+        unified_job_template:
+          name: "{{ aap_prefix }}-delete-host"
+          type: job_template
+        related:
+          failure_nodes:
+            - identifier: "report-host-status-failure"
+          success_nodes:
+            - identifier: "report-host-status-success"
+      - identifier: "report-host-status-success"
+        unified_job_template:
+          name: "{{ aap_prefix }}-report-host-status-success"
+          type: job_template
+      - identifier: "report-host-status-failure"
+        unified_job_template:
+          name: "{{ aap_prefix }}-report-host-status-failure"
+          type: job_template
 
 # Create cluster fulfillment and confg-as-code inventories. They are the same
 # for the moment, but spliting them will allow us to diverge easily in the
@@ -331,6 +435,9 @@ controller_inventories: # noqa: var-naming[no-role-prefix]
     organization: "{{ aap_organization_name }}"
   - name: "{{ aap_prefix }}-hostpool-operations"
     description: "Host Pool Operational Inventory"
+    organization: "{{ aap_organization_name }}"
+  - name: "{{ aap_prefix }}-host-operations"
+    description: "Host Operational Inventory"
     organization: "{{ aap_organization_name }}"
 
 controller_inventory_sources: # noqa: var-naming[no-role-prefix]
@@ -376,6 +483,15 @@ controller_inventory_sources: # noqa: var-naming[no-role-prefix]
     source_project: "{{ aap_prefix }}"
     source_path: "inventory/localhost.yml"
     inventory: "{{ aap_prefix }}-hostpool-operations"
+    overwrite: true
+    overwrite_vars: true
+    update_cache_timeout: 0
+  - name: "{{ aap_prefix }}-host-operations-is"
+    organization: "{{ aap_organization_name }}"
+    source: scm
+    source_project: "{{ aap_prefix }}"
+    source_path: "inventory/localhost.yml"
+    inventory: "{{ aap_prefix }}-host-operations"
     overwrite: true
     overwrite_vars: true
     update_cache_timeout: 0
@@ -682,6 +798,86 @@ controller_instance_groups: # noqa: var-naming[no-role-prefix]
               defaultMode: 420
 
   - name: "{{ aap_prefix }}-hostpool-operations-ig"
+    is_container_group: true
+    pod_spec_override: |
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        labels:
+          ansible_job: ''
+      spec:
+        serviceAccountName: cloudkit-sa
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchExpressions:
+                      - key: ansible_job
+                        operator: Exists
+                  topologyKey: kubernetes.io/hostname
+        containers:
+          - image: >-
+              {{ aap_ee_image }}
+            name: worker
+            args:
+              - ansible-runner
+              - worker
+              - '--private-data-dir=/runner'
+            volumeMounts:
+              - name: kube-api-access
+                mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+                readOnly: true
+              - name: fulfillment-service-tls
+                mountPath: /certs
+            env:
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: POD_UID
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.uid
+              - name: SSL_CERT_FILE
+                value: /certs/ca.crt
+            envFrom:
+              - secretRef:
+                  name: cluster-fulfillment-ig
+        volumes:
+          - name: kube-api-access
+            projected:
+              sources:
+                - serviceAccountToken:
+                    path: token
+                    expirationSeconds: 3600
+                - configMap:
+                    name: kube-root-ca.crt
+                    items:
+                      - key: ca.crt
+                        path: ca.crt
+                - downwardAPI:
+                    items:
+                      - path: namespace
+                        fieldRef:
+                          apiVersion: v1
+                          fieldPath: metadata.namespace
+                - configMap:
+                    name: openshift-service-ca.crt
+                    items:
+                      - key: service-ca.crt
+                        path: service-ca.crt
+              defaultMode: 420
+          - name: fulfillment-service-tls
+            secret:
+              secretName: fulfillment-service-tls
+
+  - name: "{{ aap_prefix }}-host-operations-ig"
     is_container_group: true
     pod_spec_override: |
       apiVersion: v1

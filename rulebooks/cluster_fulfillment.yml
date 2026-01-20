@@ -48,3 +48,17 @@
         run_workflow_template:
           name: "{{ job_template_prefix }}-delete-hostpool-workflow"
           organization: "{{ job_template_organization }}"
+
+    - name: Create host
+      condition: event.meta.endpoint == "create-host"
+      action:
+        run_workflow_template:
+          name: "{{ job_template_prefix }}-create-host-workflow"
+          organization: "{{ job_template_organization }}"
+
+    - name: Delete host
+      condition: event.meta.endpoint == "delete-host"
+      action:
+        run_workflow_template:
+          name: "{{ job_template_prefix }}-delete-host-workflow"
+          organization: "{{ job_template_organization }}"

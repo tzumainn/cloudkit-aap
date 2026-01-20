@@ -1,0 +1,3 @@
+- name: Set power state of the host # noqa:no-changed-when
+  ansible.builtin.command: >-
+    openstack baremetal node power {{ host_target_power_state | massopencloud.esi.osac_power_state_to_ironic_action }} {{ host_uid }}

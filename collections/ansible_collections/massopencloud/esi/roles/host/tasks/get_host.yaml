@@ -1,0 +1,8 @@
+- name: Get node information
+  openstack.cloud.baremetal_node_info:
+    name: "{{ host_uid }}"
+  register: baremetal_node_info_result
+
+- name: Transform Ironic node into OSAC host
+  ansible.builtin.set_fact:
+    host: "{{ baremetal_node_info_result.baremetal_nodes[0] | massopencloud.esi.ironic_node_to_osac_host }}"
