@@ -7,9 +7,6 @@ controller_projects: # noqa: var-naming[no-role-prefix]
   - name: "{{ aap_prefix }}"
     description: "{{ aap_project_name }}'s project"
     organization: "{{ aap_organization_name }}"
-    scm_type: git
-    scm_url: "{{ aap_project_git_uri }}"
-    scm_branch: "{{ aap_project_git_branch }}"
     scm_clean: true
     scm_update_on_launch: true
     scm_credential: ""

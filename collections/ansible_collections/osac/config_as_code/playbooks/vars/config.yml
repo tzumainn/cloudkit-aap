@@ -10,6 +10,7 @@ aap_project_name: "{{ lookup('env', 'AAP_PROJECT_NAME', default=current_namespac
 aap_prefix: "{{ lookup('env', 'AAP_PREFIX', default=aap_organization_name) }}"
 aap_project_git_uri: "{{ lookup('env', 'AAP_PROJECT_GIT_URI', default='https://github.com/osac-project/osac-aap.git') }}"
 aap_project_git_branch: "{{ lookup('env', 'AAP_PROJECT_GIT_BRANCH', default='main') }}"
+aap_project_archive_uri: "{{ lookup('env', 'AAP_PROJECT_ARCHIVE_URI', default=Undefined) }}"
 aap_ee_image: "{{ lookup('env', 'AAP_EE_IMAGE', default='ghcr.io/osac/osac-aap:latest') }}"
 license_manifest_path: "{{ lookup('env', 'LICENSE_MANIFEST_PATH', default='/var/secrets/config-as-code-manifest/license.zip') }}"
 remote_cluster_kubeconfig_secret_name: "{{ lookup('env', 'REMOTE_CLUSTER_KUBECONFIG_SECRET_NAME', default=Undefined) }}"

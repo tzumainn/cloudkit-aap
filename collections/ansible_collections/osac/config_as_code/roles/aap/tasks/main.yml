@@ -3,6 +3,9 @@
   ansible.builtin.include_vars:
     dir: vars/
 
+- name: Configure project SCM and merge into controller projects
+  ansible.builtin.include_tasks: configure_project_scm.yml
+
 - name: Disable rulebook activations in configuration
   ansible.builtin.set_fact:
     rulebook_activations_disabled: >
