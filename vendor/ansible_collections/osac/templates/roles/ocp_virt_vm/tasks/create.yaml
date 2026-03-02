@@ -6,6 +6,9 @@
 # template_parameters: All template variables passed.  Defined in arguement_specs.yaml
 # default_arg_specs: default values for arguement_specs
 ---
+- name: Include get remote cluster kubeconfig
+  ansible.builtin.include_tasks: get_remote_cluster_kubeconfig.yaml
+
 - name: Merge template defaults into template_parameters
   ansible.builtin.set_fact:
     params: "{{ default_arg_specs | combine(template_parameters) }}"
@@ -84,6 +87,7 @@
 
     - name: Create user-data secret in VM namespace
       kubernetes.core.k8s:
+        kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
         state: present
         definition:
           apiVersion: v1
@@ -138,6 +142,7 @@
   block:
     - name: Create Secret resource containing ssh public key
       kubernetes.core.k8s:
+        kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
         state: present
         definition:
           apiVersion: v1
@@ -165,6 +170,7 @@
 
 - name: Get the all StorageClasses
   kubernetes.core.k8s_info:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: storage.k8s.io/v1
     kind: StorageClass
   register: storage_classes
@@ -192,6 +198,7 @@
 
 - name: Create DataVolume for VM root disk
   kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     apply: true
     definition:
       apiVersion: cdi.kubevirt.io/v1beta1
@@ -215,6 +222,7 @@
 
 - name: Create DataVolumes for additional disks
   kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     apply: true
     definition:
       apiVersion: cdi.kubevirt.io/v1beta1
@@ -261,6 +269,7 @@
 
 - name: Create VirtualMachine
   kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     apply: true
     definition:
       apiVersion: kubevirt.io/v1
@@ -283,6 +292,7 @@
 
 - name: Wait for VM to be ready
   kubernetes.core.k8s_info:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
@@ -308,6 +318,7 @@
 
 - name: Get VM status
   kubernetes.core.k8s_info:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"

@@ -78,6 +78,13 @@
    "format": 1
   },
   {
+   "name": "OWNERS",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "b9a5ee7826dbe472179f46d668d772f1b33371ab1bce57e1b18558b005957497",
+   "format": 1
+  },
+  {
    "name": "README.md",
    "ftype": "file",
    "chksum_type": "sha256",
@@ -312,14 +319,21 @@
    "name": "roles/ocp_virt_vm/tasks/create.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "e4d1c5a4f21ef938e326650c6b4a2d3282bb5b1d56ce3e6114027efb855985ba",
+   "chksum_sha256": "705339bc359a75455ab98c7e1d8331ba927b312d9284f2b54497370083aff589",
    "format": 1
   },
   {
    "name": "roles/ocp_virt_vm/tasks/delete.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "1dd08fcfcd11d270a91b707e60ddd794179da2017f6627766e8467bcf40cb541",
+   "chksum_sha256": "6c2fc5b9ecf1c48a2cd0ed9d4ad52af01bb1f9614e86a05ddee8ab2777fde74d",
+   "format": 1
+  },
+  {
+   "name": "roles/ocp_virt_vm/tasks/get_remote_cluster_kubeconfig.yaml",
+   "ftype": "file",
+   "chksum_type": "sha256",
+   "chksum_sha256": "8d7e296e9535f69064543f97597fb1e91355d5213b4894b491ec1c9a78f3398b",
    "format": 1
   }
  ],

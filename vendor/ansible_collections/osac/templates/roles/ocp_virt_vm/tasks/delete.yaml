@@ -1,5 +1,10 @@
+---
+- name: Include get remote cluster kubeconfig
+  ansible.builtin.include_tasks: get_remote_cluster_kubeconfig.yaml
+
 - name: Get VirtualMachine info for floating IP cleanup
   kubernetes.core.k8s_info:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
@@ -8,6 +13,7 @@
 
 - name: Check if VM instance exists
   kubernetes.core.k8s_info:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: kubevirt.io/v1
     kind: VirtualMachineInstance
     name: "{{ compute_instance_name }}"
@@ -16,6 +22,7 @@
 
 - name: Stop VirtualMachine
   kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
@@ -28,6 +35,7 @@
 
 - name: Wait for VM to stop
   kubernetes.core.k8s_info:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
@@ -41,6 +49,7 @@
 
 - name: Delete VirtualMachine
   kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
@@ -51,6 +60,7 @@
 
 - name: Delete VM service (if it exists)
   kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: v1
     kind: Service
     name: "{{ compute_instance_name }}-service"
@@ -59,6 +69,7 @@
 
 - name: Delete VM load balancer service
   kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: v1
     kind: Service
     name: "{{ compute_instance_name }}-load-balancer"
@@ -67,6 +78,7 @@
 
 - name: Delete root disk DataVolume
   kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: cdi.kubevirt.io/v1beta1
     kind: DataVolume
     name: "{{ compute_instance_name }}-root-disk"
@@ -77,6 +89,7 @@
 
 - name: Delete additional disk DataVolumes
   kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: cdi.kubevirt.io/v1beta1
     kind: DataVolume
     name: "{{ compute_instance_name }}-disk-{{ idx + 1 }}"
@@ -91,6 +104,7 @@
 
 - name: Delete user-data secret
   kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: v1
     kind: Secret
     name: "{{ compute_instance_name }}-user-data"
@@ -104,6 +118,7 @@
 
 - name: Delete ssh public key secret
   kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: v1
     kind: Secret
     name: "{{ compute_instance_name }}-ssh-public-key"
