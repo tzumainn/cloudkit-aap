@@ -1,0 +1,26 @@
+---
+- name: Create a Subnet resource (CUDN)
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    subnet: "{{ ansible_eda.event.payload }}"
+    subnet_name: "{{ ansible_eda.event.payload.metadata.name }}"
+    template_parameters: {}
+
+  pre_tasks:
+    - name: Show EDA Event
+      ansible.builtin.debug:
+        var: ansible_eda.event.payload
+
+  tasks:
+    - name: Display Subnet information
+      ansible.builtin.debug:
+        msg:
+          - "Subnet name: {{ subnet_name }}"
+          - "Template parameters: {{ template_parameters }}"
+
+    - name: Call the Subnet role
+      ansible.builtin.include_role:
+        name: subnet
+        tasks_from: create

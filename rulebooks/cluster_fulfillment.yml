@@ -48,3 +48,31 @@
         run_workflow_template:
           name: "{{ job_template_prefix }}-delete-hostpool-workflow"
           organization: "{{ job_template_organization }}"
+
+    - name: Create virtual network
+      condition: event.meta.endpoint == "create-virtual-network"
+      action:
+        run_job_template:
+          name: "{{ job_template_prefix }}-create-virtual-network"
+          organization: "{{ job_template_organization }}"
+
+    - name: Delete virtual network
+      condition: event.meta.endpoint == "delete-virtual-network"
+      action:
+        run_job_template:
+          name: "{{ job_template_prefix }}-delete-virtual-network"
+          organization: "{{ job_template_organization }}"
+
+    - name: Create subnet
+      condition: event.meta.endpoint == "create-subnet"
+      action:
+        run_job_template:
+          name: "{{ job_template_prefix }}-create-subnet"
+          organization: "{{ job_template_organization }}"
+
+    - name: Delete subnet
+      condition: event.meta.endpoint == "delete-subnet"
+      action:
+        run_job_template:
+          name: "{{ job_template_prefix }}-delete-subnet"
+          organization: "{{ job_template_organization }}"
