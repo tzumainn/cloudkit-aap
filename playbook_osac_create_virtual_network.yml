@@ -6,6 +6,8 @@
   vars:
     virtual_network: "{{ ansible_eda.event.payload }}"
     virtual_network_name: "{{ ansible_eda.event.payload.metadata.name }}"
+    # Implementation strategy set by fulfillment-service in VirtualNetwork spec
+    implementation_strategy: "{{ ansible_eda.event.payload.spec.implementationStrategy }}"
     template_parameters: {}
 
   pre_tasks:
@@ -18,9 +20,10 @@
       ansible.builtin.debug:
         msg:
           - "VirtualNetwork name: {{ virtual_network_name }}"
+          - "Implementation strategy: {{ implementation_strategy }}"
           - "Template parameters: {{ template_parameters }}"
 
-    - name: Call the VirtualNetwork role
+    - name: Call the selected VirtualNetwork role
       ansible.builtin.include_role:
-        name: virtual_network
+        name: "{{ implementation_strategy }}_virtual_network"
         tasks_from: create
