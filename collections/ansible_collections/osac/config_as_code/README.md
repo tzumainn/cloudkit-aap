@@ -28,10 +28,10 @@ where applicable):
   `AAP_USERNAME`                            Username to authenticate against AAP                                       `admin`
 
   `AAP_PASSWORD`                            Password to authenticate against AAP (injected from                        ---
-                                            `osac-aap-admin-password` when running in-cluster)                         
+                                            `osac-aap-admin-password` when running in-cluster)
 
   `AAP_VALIDATE_CERTS`                      Whether to validate the SSL certificate behind `AAP_HOSTNAME`              `true`
-                                            (`true`/`false`)                                                           
+                                            (`true`/`false`)
 
   `AAP_ORGANIZATION_NAME`                   The AAP organization that should be created                                `osac`
 
@@ -48,8 +48,8 @@ where applicable):
   `AAP_EE_IMAGE`                            Registry URL of the execution environment image                            `ghcr.io/osac/osac-aap:latest`
 
   `LICENSE_MANIFEST_PATH`                   Path to the license manifest file to register the AAP instance (allocate   `/var/secrets/config-as-code-manifest/license.zip`
-                                            one from your [Red Hat                                                     
-                                            account](https://access.redhat.com/management/subscription_allocations))   
+                                            one from your [Red Hat
+                                            account](https://access.redhat.com/management/subscription_allocations))
 
   `REMOTE_CLUSTER_KUBECONFIG_SECRET_NAME`   Name of the secret holding the kubeconfig for the remote cluster           ---
 
