@@ -18,43 +18,24 @@ In order to reconcile the configuration of AAP, the following environment
 variables are used (injected from the `config-as-code-ig` secret or the pod
 where applicable):
 
-  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  Variable                                  Description                                                                Default
-  ----------------------------------------- -------------------------------------------------------------------------- ----------------------------------------------------
-  `AAP_INSTANCE_NAME`                       Name of the AAP instance                                                   `osac-aap`
-
-  `AAP_HOSTNAME`                            URL of the AAP instance to be configured                                   `http://` + `AAP_INSTANCE_NAME`
-
-  `AAP_USERNAME`                            Username to authenticate against AAP                                       `admin`
-
-  `AAP_PASSWORD`                            Password to authenticate against AAP (injected from                        ---
-                                            `osac-aap-admin-password` when running in-cluster)
-
-  `AAP_VALIDATE_CERTS`                      Whether to validate the SSL certificate behind `AAP_HOSTNAME`              `true`
-                                            (`true`/`false`)
-
-  `AAP_ORGANIZATION_NAME`                   The AAP organization that should be created                                `osac`
-
-  `AAP_PROJECT_NAME`                        Name of the project to be created                                          value of `NAMESPACE`
-
-  `AAP_PREFIX`                              Prefix used to create resources in AAP                                     `AAP_ORGANIZATION_NAME`
-
-  `AAP_PROJECT_GIT_URI`                     Git repository URL for the AAP project                                     `https://github.com/osac-project/osac-aap.git`
-
-  `AAP_PROJECT_GIT_BRANCH`                  Git branch to use for the project                                          `main`
-
-  `AAP_PROJECT_ARCHIVE_URI`                 Optional archive URL instead of git (e.g. tarball)                         ---
-
-  `AAP_EE_IMAGE`                            Registry URL of the execution environment image                            `ghcr.io/osac/osac-aap:latest`
-
-  `LICENSE_MANIFEST_PATH`                   Path to the license manifest file to register the AAP instance (allocate   `/var/secrets/config-as-code-manifest/license.zip`
-                                            one from your [Red Hat
-                                            account](https://access.redhat.com/management/subscription_allocations))
-
-  `REMOTE_CLUSTER_KUBECONFIG_SECRET_NAME`   Name of the secret holding the kubeconfig for the remote cluster           ---
-
-  `REMOTE_CLUSTER_KUBECONFIG_SECRET_KEY`    Key within that secret for the kubeconfig file                             `kubeconfig`
-  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Variable | Description | Default |
+|----|----|----|
+| `NAMESPACE` | OpenShift namespace (injected by the pod) | — |
+| `AAP_INSTANCE_NAME` | Name of the AAP instance | `osac-aap` |
+| `AAP_HOSTNAME` | URL of the AAP instance to be configured | `http://` + `AAP_INSTANCE_NAME` |
+| `AAP_USERNAME` | Username to authenticate against AAP | `admin` |
+| `AAP_PASSWORD` | Password to authenticate against AAP (injected from `osac-aap-admin-password` when running in-cluster) | — |
+| `AAP_VALIDATE_CERTS` | Whether to validate the SSL certificate behind `AAP_HOSTNAME` (`true`/`false`) | `true` |
+| `AAP_ORGANIZATION_NAME` | The AAP organization that should be created | `osac` |
+| `AAP_PROJECT_NAME` | Name of the project to be created | value of `NAMESPACE` |
+| `AAP_PREFIX` | Prefix used to create resources in AAP | `AAP_ORGANIZATION_NAME` |
+| `AAP_PROJECT_GIT_URI` | Git repository URL for the AAP project | `https://github.com/osac-project/osac-aap.git` |
+| `AAP_PROJECT_GIT_BRANCH` | Git branch to use for the project | `main` |
+| `AAP_PROJECT_ARCHIVE_URI` | Optional archive URL instead of git (e.g. tarball) | — |
+| `AAP_EE_IMAGE` | Registry URL of the execution environment image | `ghcr.io/osac/osac-aap:latest` |
+| `LICENSE_MANIFEST_PATH` | Path to the license manifest file to register the AAP instance ([Red Hat account](https://access.redhat.com/management/subscription_allocations)) | `/var/secrets/config-as-code-manifest/license.zip` |
+| `REMOTE_CLUSTER_KUBECONFIG_SECRET_NAME` | Name of the secret holding the kubeconfig for the remote cluster (cluster fulfillment only) | — |
+| `REMOTE_CLUSTER_KUBECONFIG_SECRET_KEY` | Key within that secret for the kubeconfig file | `kubeconfig` |
 
 These variables must be defined in a secret named `config-as-code-ig` in the
 namespace where AAP is deployed.
@@ -74,7 +55,7 @@ use case, e.g.:
 
 - `AWS_*`: AWS credentials
 - `OS_*`: OpenStack credentials
-- ...whatever in needed
+- …whatever in needed
 
 These variables must be defined in a secret named: `cluster-fulfillment-ig` in
 the namespace where AAP is deployed.
@@ -258,7 +239,7 @@ publisher to authenticate against the
     metadata:
       name: aap-fulfillment-template-publisher-binding
       namespace: osac
-    roleRef:
+    roleRef:-
       apiGroup: rbac.authorization.k8s.io
       kind: Role
       name: create-controller-token
