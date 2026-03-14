@@ -1,0 +1,16 @@
+---
+argument_specs:
+  main:
+    options:
+      vpc_state:
+        type: str
+        choices: [absent]
+        default: absent
+        description: "Whether to delete the VPC."
+
+  delete:
+    options:
+      vpc_name:
+        type: str
+        required: true
+        description: "Name of the VPC to delete."

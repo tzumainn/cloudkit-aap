@@ -1,0 +1,176 @@
+---
+- name: Set dns names
+  ansible.builtin.set_fact:
+    external_access_api_domain: "api.{{ external_access_name }}.{{ external_access_base_domain }}"
+    external_access_api_int_domain: "api-int.{{ external_access_name }}.{{ external_access_base_domain }}"
+    external_access_ingress_domain: "apps.{{ external_access_name }}.{{ external_access_base_domain }}"
+
+- name: Get kube-apiserver service
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Service
+    namespace: "{{ external_access_namespace }}-{{ external_access_name }}"
+    name: kube-apiserver
+  register: kube_apiserver_service
+  until: >-
+    kube_apiserver_service.resources and
+    kube_apiserver_service.resources[0].status.loadBalancer.ingress | default(false)
+  retries: "{{ external_access_resource_wait_retries }}"
+  delay: "{{ external_access_resource_wait_delay }}"
+
+- name: Set api_internal_ip
+  ansible.builtin.set_fact:
+    external_access_api_internal_ip: "{{ kube_apiserver_service.resources[0].status.loadBalancer.ingress[0].ip }}"
+    external_access_kube_apiserver_port: "{{ kube_apiserver_service.resources[0].spec.ports[0].port }}"
+
+- name: Allocate NAT IPs from Netris IPAM
+  ansible.builtin.include_role:
+    name: netris.controller.ipam
+  vars:
+    ipam_site_id: "{{ netris_site_id }}"
+    ipam_purpose: nat
+    ipam_count: 2
+
+- name: Set dynamically allocated NAT IPs
+  ansible.builtin.set_fact:
+    netris_dnat_api_ip: "{{ ipam_allocated_ips[0] }}"
+    netris_dnat_ingress_ip: "{{ ipam_allocated_ips[1] }}"
+
+- name: Delete existing DNAT rule for API endpoint
+  ansible.builtin.include_role:
+    name: netris.controller.nat
+  vars:
+    nat_name: "{{ external_access_name }}-api-dnat"
+    nat_state: absent
+    nat_site_id: "{{ netris_site_id }}"
+
+- name: Create DNAT rule for API endpoint
+  ansible.builtin.include_role:
+    name: netris.controller.nat
+  vars:
+    nat_name: "{{ external_access_name }}-api-dnat"
+    nat_state: present
+    nat_site_id: "{{ netris_site_id }}"
+    nat_vpc_id: "{{ netris_mgmt_vpc_id }}"
+    nat_vpc_name: "{{ netris_mgmt_vpc_name | default('') }}"
+    nat_action: dnat
+    nat_protocol: tcp
+    nat_destination_address: "{{ netris_dnat_api_ip }}/32"
+    nat_destination_port: "6443"
+    nat_dnat_to_ip: "{{ external_access_api_internal_ip }}/32"
+    nat_dnat_to_port: "{{ external_access_kube_apiserver_port }}"
+    nat_comment: "OSAC API DNAT for {{ external_access_name }}"
+
+- name: Set external_access_api_floating_ip
+  ansible.builtin.set_fact:
+    external_access_api_floating_ip: "{{ netris_dnat_api_ip }}"
+
+- name: Create dns records
+  when: >-
+    external_access_base_domain in external_access_supported_base_domains | default([])
+  amazon.aws.route53:
+    state: present
+    zone: "{{ external_access_base_domain }}"
+    record: "{{ item.name }}"
+    type: A
+    ttl: "{{ external_access_dns_ttl }}"
+    value: "{{ item.addr | ansible.utils.ipaddr('address') }}"
+    wait: true
+    overwrite: true
+  environment:
+    AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') | trim }}"
+    AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') | trim }}"
+  loop:
+    - name: "{{ external_access_api_domain }}"
+      addr: "{{ external_access_api_floating_ip }}"
+    - name: "{{ external_access_api_int_domain }}"
+      addr: "{{ external_access_api_floating_ip }}"
+    - name: "*.{{ external_access_ingress_domain }}"
+      addr: "{{ netris_dnat_ingress_ip }}"
+
+- name: Wait for DNS records
+  ansible.builtin.include_role:
+    name: osac.service.wait_for
+    tasks_from: wait_for_dns
+  vars:
+    wait_for_dns_record: "{{ item }}"
+  loop:
+    - "{{ external_access_api_domain }}"
+    - "{{ external_access_api_int_domain }}"
+    - "default-router.{{ external_access_ingress_domain }}"
+
+- name: Get managed cluster admin kubeconfig secret
+  ansible.builtin.include_role:
+    name: osac.service.retrieve_kubeconfig
+  vars:
+    retrieve_kubeconfig_namespace: "{{ cluster_working_namespace }}"
+    retrieve_kubeconfig_cluster_name: "{{ cluster_order.metadata.name }}"
+
+- name: Wait for network cluster operator to become ready
+  ansible.builtin.include_role:
+    name: osac.service.wait_for
+    tasks_from: wait_for_network_cluster_operator
+  vars:
+    wait_for_kubeconfig: "{{ admin_kubeconfig }}"
+
+- name: Set external_access_metallb_ingress_ip
+  ansible.builtin.set_fact:
+    external_access_metallb_ingress_ip: "{{ netris_metallb_ingress_ip }}"
+
+- name: Configure metallb for ingress
+  ansible.builtin.include_role:
+    name: osac.service.metallb_ingress
+    tasks_from: configure_metallb_ingress
+  vars:
+    metallb_ingress_admin_kubeconfig: "{{ admin_kubeconfig }}"
+    metallb_ingress_ip: "{{ external_access_metallb_ingress_ip }}"
+
+- name: Delete existing DNAT rule for ingress HTTP
+  ansible.builtin.include_role:
+    name: netris.controller.nat
+  vars:
+    nat_name: "{{ external_access_name }}-ingress-http-dnat"
+    nat_state: absent
+    nat_site_id: "{{ netris_site_id }}"
+
+- name: Create DNAT rule for ingress HTTP
+  ansible.builtin.include_role:
+    name: netris.controller.nat
+  vars:
+    nat_name: "{{ external_access_name }}-ingress-http-dnat"
+    nat_state: present
+    nat_site_id: "{{ netris_site_id }}"
+    nat_vpc_id: "{{ server_cluster_vpc_id | default(netris_l4lb_vpc_id) }}"
+    nat_vpc_name: "{{ server_cluster_vpc_name | default(netris_l4lb_vpc_name) | default('') }}"
+    nat_action: dnat
+    nat_protocol: tcp
+    nat_destination_address: "{{ netris_dnat_ingress_ip }}/32"
+    nat_destination_port: "80"
+    nat_dnat_to_ip: "{{ external_access_metallb_ingress_ip }}/32"
+    nat_dnat_to_port: "80"
+    nat_comment: "OSAC ingress HTTP DNAT for {{ external_access_name }}"
+
+- name: Delete existing DNAT rule for ingress HTTPS
+  ansible.builtin.include_role:
+    name: netris.controller.nat
+  vars:
+    nat_name: "{{ external_access_name }}-ingress-https-dnat"
+    nat_state: absent
+    nat_site_id: "{{ netris_site_id }}"
+
+- name: Create DNAT rule for ingress HTTPS
+  ansible.builtin.include_role:
+    name: netris.controller.nat
+  vars:
+    nat_name: "{{ external_access_name }}-ingress-https-dnat"
+    nat_state: present
+    nat_site_id: "{{ netris_site_id }}"
+    nat_vpc_id: "{{ server_cluster_vpc_id | default(netris_l4lb_vpc_id) }}"
+    nat_vpc_name: "{{ server_cluster_vpc_name | default(netris_l4lb_vpc_name) | default('') }}"
+    nat_action: dnat
+    nat_protocol: tcp
+    nat_destination_address: "{{ netris_dnat_ingress_ip }}/32"
+    nat_destination_port: "443"
+    nat_dnat_to_ip: "{{ external_access_metallb_ingress_ip }}/32"
+    nat_dnat_to_port: "443"
+    nat_comment: "OSAC ingress HTTPS DNAT for {{ external_access_name }}"

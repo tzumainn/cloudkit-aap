@@ -27,6 +27,9 @@
         install_step_external_access_override:
           name: osac.workflows.workflow_helpers
           tasks_from: noop.yml
+        install_step_wait_for_cluster_operators_override:
+          name: osac.workflows.workflow_helpers
+          tasks_from: noop.yml
         install_step_retrieve_kubeconfig_override:
           name: osac.workflows.workflow_helpers
           tasks_from: noop.yml

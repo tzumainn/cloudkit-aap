@@ -173,3 +173,6 @@ context/
 
 # Integration test generated files
 tests/integration/kubeconfig-*
+
+# CLAUDE.md
+CLAUDE.md

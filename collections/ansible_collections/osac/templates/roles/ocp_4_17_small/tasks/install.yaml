@@ -15,6 +15,9 @@
     install_step_retrieve_kubeconfig_default:
       name: osac.service.retrieve_kubeconfig
       tasks_from: main.yaml
+    install_step_wait_for_cluster_operators_default:
+      name: osac.service.wait_for
+      tasks_from: wait_for_cluster_operators.yaml
     install_step_post_install_hook_default:
       name: osac.templates.ocp_4_17_small
       tasks_from: noop.yaml
@@ -65,6 +68,13 @@
   vars:
     retrieve_kubeconfig_cluster_name: "{{ cluster_order.metadata.name }}"
     retrieve_kubeconfig_namespace: "{{ cluster_working_namespace }}"
+
+- name: Step - Wait for cluster operators
+  ansible.builtin.include_role:
+    name: "{{ (install_step_wait_for_cluster_operators_override | default(install_step_wait_for_cluster_operators_default)).name }}"
+    tasks_from: "{{ (install_step_wait_for_cluster_operators_override | default(install_step_wait_for_cluster_operators_default)).tasks_from }}"
+  vars:
+    wait_for_kubeconfig: "{{ admin_kubeconfig }}"
 
 - name: Step - Post-install hook
   ansible.builtin.include_role:

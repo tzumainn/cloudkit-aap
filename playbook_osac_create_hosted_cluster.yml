@@ -7,6 +7,13 @@
     cluster_order: "{{ ansible_eda.event.payload }}"
 
   pre_tasks:
+    - name: Write SSH keys from env vars to files
+      ansible.builtin.include_role:
+        name: osac.service.write_ssh_keys
+      when:
+        - network_class | default('') == 'netris'
+        - lookup('env', 'SERVER_SSH_KEY') | length > 0
+
     - name: Set cluster order name
       ansible.builtin.set_fact:
         cluster_order_name: "{{ cluster_order.metadata.name }}"

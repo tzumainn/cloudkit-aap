@@ -78,6 +78,9 @@
     value: "{{ item.addr }}"
     wait: true
     overwrite: true
+  environment:
+    AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') | trim }}"
+    AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') | trim }}"
   loop:
     - name: "{{ external_access_api_domain }}"
       addr: "{{ external_access_api_floating_ip }}"
@@ -107,7 +110,7 @@
 - name: Wait for cluster to become ready
   ansible.builtin.include_role:
     name: osac.service.wait_for
-    tasks_from: wait_for_cluster
+    tasks_from: wait_for_network_cluster_operator
   vars:
     wait_for_kubeconfig: "{{ admin_kubeconfig }}"
 

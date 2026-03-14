@@ -25,6 +25,7 @@
   loop_control:
     label: "Detach agent {{ agent.metadata.name }}"
     loop_var: agent
+  when: not (manage_agents_skip_network_detach | default(false))
 
 - name: Determine which agents have cluster_order_label
   ansible.builtin.set_fact:

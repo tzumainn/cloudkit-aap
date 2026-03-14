@@ -1,0 +1,25 @@
+---
+argument_specs:
+  main:
+    options:
+      ipam_state:
+        type: str
+        choices: [read]
+        default: read
+        description: "IPAM operation to perform."
+
+  read:
+    options:
+      ipam_site_id:
+        type: int
+        required: true
+        description: "Netris site ID to filter subnets by."
+      ipam_purpose:
+        type: str
+        default: nat
+        description: "Subnet purpose to filter by."
+        choices: [nat, load-balancer, common]
+      ipam_count:
+        type: int
+        default: 1
+        description: "Number of IPs to allocate. Must be >= 1."

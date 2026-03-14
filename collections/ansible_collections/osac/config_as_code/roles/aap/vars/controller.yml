@@ -426,6 +426,9 @@ controller_instance_groups: # noqa: var-naming[no-role-prefix]
                   fieldRef:
                     fieldPath: metadata.uid
             envFrom:
+              - configMapRef:
+                  name: cluster-fulfillment-ig
+                  optional: true
               - secretRef:
                   name: cluster-fulfillment-ig
         volumes:

@@ -1,0 +1,4 @@
+---
+- name: Read IPAM for available IPs
+  ansible.builtin.include_tasks: read.yaml
+  when: ipam_state == 'read'

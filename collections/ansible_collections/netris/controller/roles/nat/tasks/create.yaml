@@ -1,0 +1,69 @@
+---
+- name: Ensure Netris auth
+  ansible.builtin.include_role:
+    name: netris.controller.auth
+  when: netris_session_cookie is not defined
+
+- name: Build NAT rule body
+  ansible.builtin.set_fact:
+    _nat_body:
+      name: "{{ nat_name }}"
+      site:
+        id: "{{ nat_site_id }}"
+      vpc:
+        id: "{{ nat_vpc_id }}"
+        name: "{{ nat_vpc_name | default('') }}"
+      state: "enabled"
+      action: "{{ nat_action | upper }}"
+      protocol: "{{ nat_protocol }}"
+      sourceAddress: "{{ nat_source_address | default('0.0.0.0/0') }}"
+      sourcePort: "{{ nat_source_port | default('1-65535') }}"
+      destinationAddress: "{{ nat_destination_address | default('0.0.0.0/0') }}"
+      destinationPort: "{{ nat_destination_port | default('1-65535') }}"
+      pool: "{{ (nat_pool | default(false) | to_json) | from_json }}"
+      portGroup: "{{ nat_port_group | default('') }}"
+      comment: "{{ nat_comment | default('') }}"
+
+- name: Add DNAT fields
+  ansible.builtin.set_fact:
+    _nat_body: >-
+      {{ _nat_body | combine({
+        'dnatToIP': nat_dnat_to_ip,
+        'dnatToPort': nat_dnat_to_port | default('')
+      }) }}
+  when: nat_action == 'dnat'
+
+- name: Add SNAT fields
+  ansible.builtin.set_fact:
+    _nat_body: >-
+      {{ _nat_body | combine({
+        'snatToIP': nat_snat_to_ip,
+        'snatToPool': nat_snat_to_pool | default('')
+      }) }}
+  when: nat_action == 'snat'
+
+- name: Reset existing NAT check (avoid stale state from prior delete call)
+  ansible.builtin.set_fact:
+    _existing_nat: null
+
+- name: Create NAT rule
+  ansible.builtin.uri:
+    url: "{{ netris_controller_url }}/api/v2/nat"
+    method: POST
+    headers:
+      Cookie: "connect.sid={{ netris_session_cookie }}"
+      Content-Type: "application/json"
+    body_format: json
+    body: "{{ _nat_body }}"
+    return_content: true
+    status_code: [200, 201]
+    validate_certs: "{{ netris_validate_certs | default(true) }}"
+  register: _nat_create_resp
+
+- name: Set nat_id from create response
+  ansible.builtin.set_fact:
+    nat_id: "{{ _nat_create_resp.json.data.id | default(_nat_create_resp.json.data) }}"
+  when:
+    - not (_nat_create_resp.skipped | default(false))
+    - _nat_create_resp is changed or (_nat_create_resp.status | default(0)) in [200, 201]
+    - _nat_create_resp.json is mapping
