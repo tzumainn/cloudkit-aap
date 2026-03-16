@@ -25,5 +25,5 @@
 
     - name: Call the selected VirtualNetwork role
       ansible.builtin.include_role:
-        name: "osac.templates.{{ implementation_strategy }}_virtual_network"
-        tasks_from: create
+        name: "osac.templates.{{ implementation_strategy }}"
+        tasks_from: create_virtual_network
