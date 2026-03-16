@@ -175,6 +175,54 @@ controller_templates: # noqa: var-naming[no-role-prefix]
     verbosity: 0
     extra_vars:
       workflow_status: failed
+  - name: "{{ aap_prefix }}-create-virtual-network"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_create_virtual_network.yml"
+    inventory: "{{ aap_prefix }}-networking-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-networking-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
+  - name: "{{ aap_prefix }}-delete-virtual-network"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_delete_virtual_network.yml"
+    inventory: "{{ aap_prefix }}-networking-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-networking-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
+  - name: "{{ aap_prefix }}-create-subnet"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_create_subnet.yml"
+    inventory: "{{ aap_prefix }}-networking-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-networking-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
+  - name: "{{ aap_prefix }}-delete-subnet"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_delete_subnet.yml"
+    inventory: "{{ aap_prefix }}-networking-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-networking-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
 
 controller_job_template_surveys: # noqa: var-naming[no-role-prefix]
   - name: "{{ aap_prefix }}-create-hosted-cluster-post-install"
@@ -329,6 +377,9 @@ controller_inventories: # noqa: var-naming[no-role-prefix]
   - name: "{{ aap_prefix }}-hostpool-operations"
     description: "Host Pool Operational Inventory"
     organization: "{{ aap_organization_name }}"
+  - name: "{{ aap_prefix }}-networking-operations"
+    description: "Networking Operational Inventory"
+    organization: "{{ aap_organization_name }}"
 
 controller_inventory_sources: # noqa: var-naming[no-role-prefix]
   - name: "{{ aap_prefix }}-cluster-fulfillment-is"
@@ -373,6 +424,15 @@ controller_inventory_sources: # noqa: var-naming[no-role-prefix]
     source_project: "{{ aap_prefix }}"
     source_path: "inventory/localhost.yml"
     inventory: "{{ aap_prefix }}-hostpool-operations"
+    overwrite: true
+    overwrite_vars: true
+    update_cache_timeout: 0
+  - name: "{{ aap_prefix }}-networking-operations-is"
+    organization: "{{ aap_organization_name }}"
+    source: scm
+    source_project: "{{ aap_prefix }}"
+    source_path: "inventory/localhost.yml"
+    inventory: "{{ aap_prefix }}-networking-operations"
     overwrite: true
     overwrite_vars: true
     update_cache_timeout: 0
@@ -617,6 +677,9 @@ controller_instance_groups: # noqa: var-naming[no-role-prefix]
     is_container_group: true
     pod_spec_override: "{{ lookup('ansible.builtin.template', 'compute-instance-operations-ig.j2') }}"
 
+  - name: "{{ aap_prefix }}-networking-operations-ig"
+    is_container_group: true
+    pod_spec_override: "{{ lookup('ansible.builtin.template', 'compute-instance-operations-ig.j2') }}"
   - name: "{{ aap_prefix }}-hostpool-operations-ig"
     is_container_group: true
     pod_spec_override: |

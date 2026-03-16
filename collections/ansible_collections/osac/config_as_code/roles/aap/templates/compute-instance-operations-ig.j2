@@ -19,6 +19,7 @@ spec:
     - image: >-
         {{ aap_ee_image }}
       name: worker
+      imagePullPolicy: Always
       args:
         - ansible-runner
         - worker
