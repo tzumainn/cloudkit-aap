@@ -1,0 +1,7 @@
+---
+title: CUDN Network Implementation
+description: >
+  Provisions networking resources using ClusterUserDefinedNetwork (CUDN) on OpenShift.
+  Handles both VirtualNetwork (logical grouping) and Subnet (CUDN + Namespace creation).
+
+template_type: network
