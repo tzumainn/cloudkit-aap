@@ -127,27 +127,6 @@
    "format": 1
   },
   {
-   "name": "roles/common",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
-   "format": 1
-  },
-  {
-   "name": "roles/common/tasks",
-   "ftype": "dir",
-   "chksum_type": null,
-   "chksum_sha256": null,
-   "format": 1
-  },
-  {
-   "name": "roles/common/tasks/get_remote_cluster_kubeconfig.yaml",
-   "ftype": "file",
-   "chksum_type": "sha256",
-   "chksum_sha256": "93b610ceeba60d796a9eb2bd6b295337e67cb8751090cb37f5cbf45cfd011470",
-   "format": 1
-  },
-  {
    "name": "roles/cudn_net",
    "ftype": "dir",
    "chksum_type": null,
@@ -186,7 +165,7 @@
    "name": "roles/cudn_net/meta/osac.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "d4cf131ff1dc56b15d2cad7d9a7c670387e93900c8d721792ab26cd5efe7d18a",
+   "chksum_sha256": "76225dadf41d15fda1501990b171bed3e98430b68be0ef9fb79ddd7b74e303d8",
    "format": 1
   },
   {
@@ -200,28 +179,28 @@
    "name": "roles/cudn_net/tasks/create_subnet.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "93b971b242419709ae2903ece0aa9b5325b8b25a2f4eef193bd60155a01a9f95",
+   "chksum_sha256": "062dcc85212377992333525951d913d061a7855f6c8e312ab2bbffe749f3e3ca",
    "format": 1
   },
   {
    "name": "roles/cudn_net/tasks/create_virtual_network.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "010c0bc7e852bc9fda313f2e3928dc7a0f4808709719eec6a5561ad62cae4666",
+   "chksum_sha256": "0f33bbeb3cdfc2a87d6ad1cbd19a91d1e99afef5e63c05d29f37c1f74cf30f53",
    "format": 1
   },
   {
    "name": "roles/cudn_net/tasks/delete_subnet.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "7be9767a0cb825d190303f94b53a216d9391e6b506fe7ba7a2db4b9955995efa",
+   "chksum_sha256": "c62d49351c8a076fca3a61f549248ea94c297fa8b335ce66e869580d33993950",
    "format": 1
   },
   {
    "name": "roles/cudn_net/tasks/delete_virtual_network.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "3423fc2a9237d79fa7c64be7069111ee5ae5b2b25293f4446d6e1f8395077149",
+   "chksum_sha256": "3f9b5247a6675fcb5b205c0ba7e58d800f8b2b6ff859b7984c76a87940b298af",
    "format": 1
   },
   {
@@ -417,14 +396,14 @@
    "name": "roles/ocp_virt_vm/tasks/create.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "a235de3b12289c1b20f9b53e4281aa0905a3c730fb400302adac4a8b2039955e",
+   "chksum_sha256": "39127816ff7a6cae3e37b77d083a9c1d117e8b6d71b15d90a7ea6a0a7aef0d21",
    "format": 1
   },
   {
    "name": "roles/ocp_virt_vm/tasks/delete.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "b862016f126878320c714d39966ed811b2f9b101868b08a13a9ef3b6b461606b",
+   "chksum_sha256": "677e245ecc3dfad2645a51567f3239749431a127ea94657d31c25e4ab52dd293",
    "format": 1
   }
  ],

@@ -23,3 +23,59 @@
           - tenant_storage_class_name | length > 0
         fail_msg: "Role did not set tenant_storage_class_name"
         success_msg: "Discovered StorageClass: {{ tenant_storage_class_name }}"
+
+# ──────────────────────────────────────────────────────────────
+# Test: Shared SC fallback
+# Prerequisites: No SC labeled osac.openshift.io/tenant=<test_tenant_name_no_sc>
+#                on the cluster, but one SC labeled osac.openshift.io/tenant=Default
+#                exists.
+# Expected: role succeeds, tenant_storage_class_name set to the Default SC name,
+#           WARNING message logged about storage not being isolated.
+# Run: ansible-playbook ... -e test_tenant_name_no_sc=tenant-no-dedicated-sc
+# ──────────────────────────────────────────────────────────────
+- name: Test tenant_storage_class role — shared Default SC fallback
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Discover StorageClass for tenant with no dedicated SC (should fall back to Default)
+      ansible.builtin.include_role:
+        name: osac.service.tenant_storage_class
+      vars:
+        tenant_storage_class_tenant_name: "{{ test_tenant_name_no_sc | default('tenant-no-dedicated-sc') }}"
+
+    - name: Verify discovered StorageClass name is set (from Default SC)
+      ansible.builtin.assert:
+        that:
+          - tenant_storage_class_name is defined
+          - tenant_storage_class_name | length > 0
+        fail_msg: "Role did not set tenant_storage_class_name when falling back to Default SC"
+        success_msg: "Discovered shared StorageClass: {{ tenant_storage_class_name }}"
+
+# ──────────────────────────────────────────────────────────────
+# Test: Neither tenant SC nor Default SC exists (error path)
+# Prerequisites: No SC labeled with the tenant name and no SC labeled
+#                osac.openshift.io/tenant=Default on the cluster.
+# Expected: role fails with "No StorageClass found" message.
+# Run: ansible-playbook ... -e test_tenant_name_missing=tenant-missing
+# ──────────────────────────────────────────────────────────────
+- name: Test tenant_storage_class role — no SC at all (should fail)
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Attempt to discover StorageClass for tenant with no SC at all (expected to fail)
+      ansible.builtin.include_role:
+        name: osac.service.tenant_storage_class
+      vars:
+        tenant_storage_class_tenant_name: "{{ test_tenant_name_missing | default('tenant-missing') }}"
+      ignore_errors: true
+      register: no_sc_result
+
+    - name: Verify role failed with expected message
+      ansible.builtin.assert:
+        that:
+          - no_sc_result is failed
+          - "'No StorageClass found' in no_sc_result.msg"
+        fail_msg: "Role did not fail as expected when no SC exists"
+        success_msg: "Role failed as expected: {{ no_sc_result.msg }}"

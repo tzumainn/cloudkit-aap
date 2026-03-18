@@ -1,10 +1,12 @@
 ---
-# Discover the tenant's StorageClass on the VM cluster.
-# Queries StorageClasses by label osac.openshift.io/tenant only.
-# CSP is allowed to create only one StorageClass per tenant.
+# Discover the StorageClass to use for a tenant.
+# Fallback chain:
+#   1. StorageClass labeled osac.openshift.io/tenant=<tenant-name>  (tenant-specific)
+#   2. StorageClass labeled osac.openshift.io/tenant=Default         (shared fallback)
+#   3. Fail with a clear error message
 # Sets tenant_storage_class_name or fails.
 
-- name: Query StorageClasses for tenant on VM cluster
+- name: Query tenant-specific StorageClass
   kubernetes.core.k8s_info:
     api_version: storage.k8s.io/v1
     kind: StorageClass
@@ -13,15 +15,45 @@
     kubeconfig: "{{ kubeconfig if (kubeconfig is defined and kubeconfig | length > 0) else omit }}"
   register: tenant_storage_classes
 
-- name: Require exactly one StorageClass for tenant
-  ansible.builtin.assert:
-    that: tenant_storage_classes.resources | length == 1
-    fail_msg: >-
-      Expected exactly one StorageClass for tenant '{{ tenant_storage_class_tenant_name }}'
-      (label osac.openshift.io/tenant). Found {{ tenant_storage_classes.resources | length }}.
-      CSP should create only one StorageClass per tenant, labeled with osac.openshift.io/tenant, on the VM cluster.
-    success_msg: "Found tenant StorageClass for '{{ tenant_storage_class_tenant_name }}'."
+- name: Query shared (Default) StorageClass as fallback
+  kubernetes.core.k8s_info:
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+    label_selectors:
+      - "osac.openshift.io/tenant=Default"
+    kubeconfig: "{{ kubeconfig if (kubeconfig is defined and kubeconfig | length > 0) else omit }}"
+  register: default_storage_classes
+  when: tenant_storage_classes.resources | length == 0
 
-- name: Set tenant StorageClass name
+- name: Warn when using shared StorageClass
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: No tenant-specific StorageClass found for tenant
+      '{{ tenant_storage_class_tenant_name }}'. Falling back to shared
+      StorageClass '{{ default_storage_classes.resources[0].metadata.name }}'.
+      Storage is NOT isolated for this tenant.
+  when:
+    - tenant_storage_classes.resources | length == 0
+    - default_storage_classes.resources is defined
+    - default_storage_classes.resources | length > 0
+
+- name: Fail if no StorageClass found for tenant or as shared default
+  ansible.builtin.fail:
+    msg: >-
+      No StorageClass found for tenant '{{ tenant_storage_class_tenant_name }}'
+      (label: osac.openshift.io/tenant={{ tenant_storage_class_tenant_name }})
+      and no shared default StorageClass found
+      (label: osac.openshift.io/tenant=Default).
+      A CSP admin must create a labeled StorageClass before provisioning.
+  when:
+    - tenant_storage_classes.resources | length == 0
+    - default_storage_classes.resources is not defined or default_storage_classes.resources | length == 0
+
+- name: Set StorageClass name
   ansible.builtin.set_fact:
-    tenant_storage_class_name: "{{ tenant_storage_classes.resources[0].metadata.name }}"
+    tenant_storage_class_name: >-
+      {{
+        (tenant_storage_classes.resources | first).metadata.name
+        if tenant_storage_classes.resources | length > 0
+        else (default_storage_classes.resources | first).metadata.name
+      }}
