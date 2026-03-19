@@ -4,3 +4,6 @@
 
 - name: Apply templates for compute instances
   ansible.builtin.import_tasks: compute_instances.yaml
+
+- name: Apply network classes
+  ansible.builtin.import_tasks: network_classes.yaml

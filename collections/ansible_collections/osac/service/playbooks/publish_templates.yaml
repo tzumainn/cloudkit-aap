@@ -35,6 +35,10 @@
       ansible.builtin.debug:
         var: osac_compute_instance_templates
 
+    - name: Print NetworkClass definitions found.
+      ansible.builtin.debug:
+        var: osac_network_classes
+
     - name: Publish templates
       ansible.builtin.include_role:
         name: osac.service.publish_templates

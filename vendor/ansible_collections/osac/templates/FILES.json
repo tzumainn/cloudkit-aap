@@ -186,7 +186,7 @@
    "name": "roles/cudn_net/meta/osac.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "76225dadf41d15fda1501990b171bed3e98430b68be0ef9fb79ddd7b74e303d8",
+   "chksum_sha256": "d4cf131ff1dc56b15d2cad7d9a7c670387e93900c8d721792ab26cd5efe7d18a",
    "format": 1
   },
   {
@@ -417,7 +417,7 @@
    "name": "roles/ocp_virt_vm/tasks/create.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "ab6543e94007bd3d9e518843ae3b921469c235144d491f32afb3d03bb6d96840",
+   "chksum_sha256": "a235de3b12289c1b20f9b53e4281aa0905a3c730fb400302adac4a8b2039955e",
    "format": 1
   },
   {

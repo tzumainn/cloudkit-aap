@@ -5,3 +5,10 @@ description: >
   Handles both VirtualNetwork (logical grouping) and Subnet (CUDN + Namespace creation).
 
 template_type: network
+
+# NetworkClass registration fields
+implementation_strategy: cudn-net
+capabilities:
+  supports_ipv4: true
+  supports_ipv6: true
+  supports_dual_stack: true
