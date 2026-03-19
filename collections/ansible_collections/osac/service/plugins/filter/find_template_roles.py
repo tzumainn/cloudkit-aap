@@ -183,6 +183,15 @@ class NodeSet(Base):
 class TemplateTypeEnum(StrEnum):
     cluster = "cluster"
     compute_instance = "compute_instance"
+    network = "network"
+
+
+class NetworkClassCapabilities(Base):
+    """Capabilities supported by a network class"""
+
+    supports_ipv4: bool = False
+    supports_ipv6: bool = False
+    supports_dual_stack: bool = False
 
 
 class Metadata(Base):
@@ -195,6 +204,9 @@ class Metadata(Base):
     )
     default_node_request: list[NodeRequest] = pydantic.Field(default_factory=list)
     allowed_resource_classes: list[str] | None = None
+    # Network-specific fields
+    implementation_strategy: str | None = None
+    capabilities: NetworkClassCapabilities | None = None
 
 
 class BaseTemplate(Base):
@@ -243,6 +255,35 @@ class ComputeInstanceTemplate(BaseTemplate):
     template_type: Literal[TemplateTypeEnum.compute_instance] = pydantic.Field(
         default=TemplateTypeEnum.compute_instance, exclude=True
     )
+
+
+class NetworkClassTemplate(Base):
+    """Template for NetworkClass registration.
+
+    Unlike cluster/compute_instance templates, NetworkClass resources have a different
+    shape (implementation_strategy, capabilities) rather than parameters. This model
+    serializes directly to the NetworkClass API payload.
+    """
+
+    collection: str = pydantic.Field(..., exclude=True)
+    path: Path = pydantic.Field(..., exclude=True)
+    name: str = pydantic.Field(..., exclude=True)
+    template_type: Literal[TemplateTypeEnum.network] = pydantic.Field(
+        default=TemplateTypeEnum.network, exclude=True
+    )
+    title: str
+    description: str | None = None
+    implementation_strategy: str
+    capabilities: NetworkClassCapabilities
+
+    @pydantic.field_serializer("path")
+    def serialize_path(self, value: Path):
+        return str(value)
+
+    @pydantic.computed_field
+    def id(self) -> str:
+        return f"{self.collection}.{self.name}"
+
 
 def _validate_collection_name(name: str) -> None:
     """Validate that collection name follows namespace.collection format.
@@ -354,11 +395,11 @@ class Collection(Base):
 
         return template_params
 
-    def templates(self) -> Generator[BaseTemplate, None, None]:
+    def templates(self) -> Generator[BaseTemplate | NetworkClassTemplate, None, None]:
         """Generate Template objects for all roles in this collection.
 
         Yields:
-            BaseTemplate objects (ClusterTemplate or ComputeInstanceTemplate) for each valid role found
+            BaseTemplate or NetworkClassTemplate objects for each valid role found
         """
         roles_dir = self.parent_path / self.name.replace(".", "/") / "roles"
 
@@ -396,6 +437,22 @@ class Collection(Base):
                             default_node_request=metadata.default_node_request,
                             allowed_resource_classes=metadata.allowed_resource_classes,
                         )
+                    elif metadata.template_type == TemplateTypeEnum.network:
+                        if not metadata.implementation_strategy:
+                            display.warning(
+                                f"Network role '{path.name}' in collection '{self.name}' "
+                                f"is missing required 'implementation_strategy' in osac.yaml"
+                            )
+                            continue
+                        yield NetworkClassTemplate(
+                            collection=self.name,
+                            path=path,
+                            name=path.name,
+                            title=metadata.title,
+                            description=metadata.description,
+                            implementation_strategy=metadata.implementation_strategy,
+                            capabilities=metadata.capabilities or NetworkClassCapabilities(),
+                        )
                     else:
                         yield ComputeInstanceTemplate(**common)
                 except Exception as e:
@@ -405,14 +462,14 @@ class Collection(Base):
                     continue
 
 
-def find_template_roles(requested: list[str]) -> Generator[BaseTemplate, None, None]:
+def find_template_roles(requested: list[str]) -> Generator[BaseTemplate | NetworkClassTemplate, None, None]:
     """Find template roles in requested Ansible collections.
 
     Args:
         requested: List of collection names to search
 
     Yields:
-        BaseTemplate objects (ClusterTemplate or ComputeInstanceTemplate) found in the collections
+        BaseTemplate or NetworkClassTemplate objects found in the collections
     """
     display.vv(f"Searching for templates in collections: {', '.join(requested)}")
 
@@ -520,6 +577,34 @@ def find_template_roles_filter(template_type: TemplateTypeEnum):
     return filter_func
 
 
+def find_network_class_roles_filter(requested: list[str]) -> list[dict[str, Any]]:
+    """Filter that discovers network class roles and returns NetworkClass API payloads.
+
+    Args:
+        requested: List of collection names to search
+
+    Returns:
+        List of NetworkClass dictionaries ready for the fulfillment service API
+    """
+    try:
+        roles = (
+            role for role in find_template_roles(requested)
+            if isinstance(role, NetworkClassTemplate)
+        )
+        result = [
+            role.model_dump(by_alias=True, exclude_none=True)
+            for role in roles
+        ]
+        display.vv(f"Returning {len(result)} network class(es)")
+        return result
+
+    except AnsibleFilterError:
+        raise
+    except Exception as e:
+        display.error(f"Unexpected error in find_network_class_roles filter: {e}")
+        raise AnsibleFilterError(f"Network class discovery failed: {str(e)}")
+
+
 class FilterModule:
     """Ansible filter plugin for finding template roles."""
 
@@ -532,21 +617,22 @@ class FilterModule:
         return {
             "find_cluster_template_roles": find_template_roles_filter(TemplateTypeEnum.cluster),
             "find_compute_instance_template_roles": find_template_roles_filter(TemplateTypeEnum.compute_instance),
+            "find_network_class_roles": find_network_class_roles_filter,
         }
 
 
 if __name__ == "__main__":
     import sys
 
-    # Usage: python find_template_roles.py --type cluster|compute_instance collection1 collection2 ...
+    # Usage: python find_template_roles.py --type cluster|compute_instance|network collection1 collection2 ...
     if "--type" not in sys.argv:
         print("Error: --type parameter is required", file=sys.stderr)
-        print("Usage: python find_template_roles.py --type cluster|compute_instance collection1 collection2 ...", file=sys.stderr)
+        print("Usage: python find_template_roles.py --type cluster|compute_instance|network collection1 collection2 ...", file=sys.stderr)
         sys.exit(1)
 
     type_idx = sys.argv.index("--type")
     if type_idx + 1 >= len(sys.argv):
-        print("Error: --type requires a value (cluster or compute_instance)", file=sys.stderr)
+        print("Error: --type requires a value (cluster, compute_instance, or network)", file=sys.stderr)
         sys.exit(1)
 
     template_type = sys.argv[type_idx + 1]
@@ -554,15 +640,17 @@ if __name__ == "__main__":
 
     if not collections:
         print("Error: At least one collection name is required", file=sys.stderr)
-        print("Usage: python find_template_roles.py --type cluster|compute_instance collection1 collection2 ...", file=sys.stderr)
+        print("Usage: python find_template_roles.py --type cluster|compute_instance|network collection1 collection2 ...", file=sys.stderr)
         sys.exit(1)
 
     if template_type == TemplateTypeEnum.cluster:
         filter_func = find_template_roles_filter(TemplateTypeEnum.cluster)
     elif template_type == TemplateTypeEnum.compute_instance:
         filter_func = find_template_roles_filter(TemplateTypeEnum.compute_instance)
+    elif template_type == TemplateTypeEnum.network:
+        filter_func = find_network_class_roles_filter
     else:
-        print(f"Error: Invalid template type '{template_type}'. Must be 'cluster' or 'compute_instance'", file=sys.stderr)
+        print(f"Error: Invalid template type '{template_type}'. Must be 'cluster', 'compute_instance', or 'network'", file=sys.stderr)
         sys.exit(1)
 
     found = filter_func(collections)
