@@ -1,4 +1,4 @@
-download_url: https://console.redhat.com/api/automation-hub/v3/plugin/ansible/content/published/collections/artifacts/ansible-eda-2.8.2.tar.gz
+download_url: https://console.redhat.com/api/automation-hub/v3/plugin/ansible/content/1274467-synclist/collections/artifacts/ansible-eda-2.8.2.tar.gz
 format_version: 1.0.0
 name: eda
 namespace: ansible
@@ -42,4 +42,4 @@ signatures:
     '
   signing_service: null
 version: 2.8.2
-version_url: /api/automation-hub/content/published/v3/plugin/ansible/content/published/collections/index/ansible/eda/versions/2.8.2/
+version_url: /api/automation-hub/content/1274467-synclist/v3/plugin/ansible/content/1274467-synclist/collections/index/ansible/eda/versions/2.8.2/
