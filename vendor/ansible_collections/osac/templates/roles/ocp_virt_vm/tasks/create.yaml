@@ -11,6 +11,14 @@
     name: common
     tasks_from: get_remote_cluster_kubeconfig
 
+- name: Determine target namespace for VM resources
+  ansible.builtin.set_fact:
+    vm_target_namespace: "{{ compute_instance.metadata.annotations['osac.openshift.io/subnet-namespace'] | default(compute_instance_working_namespace) }}"
+
+- name: Log namespace selection
+  ansible.builtin.debug:
+    msg: "VM will be created in namespace: {{ vm_target_namespace }} (tenant namespace: {{ compute_instance_working_namespace }})"
+
 - name: Merge template defaults into template_parameters
   ansible.builtin.set_fact:
     params: "{{ default_arg_specs | combine(template_parameters) }}"
@@ -95,7 +103,7 @@
           kind: Secret
           metadata:
             name: "{{ compute_instance_name }}-user-data"
-            namespace: "{{ compute_instance_working_namespace }}"
+            namespace: "{{ vm_target_namespace }}"
             labels: "{{ default_vm_labels }}"
           type: Opaque
           data: "{{ user_data_secret.resources[0].data }}"
@@ -150,7 +158,7 @@
           kind: Secret
           metadata:
             name: "{{ compute_instance_name }}-ssh-public-key"
-            namespace: "{{ compute_instance_working_namespace }}"
+            namespace: "{{ vm_target_namespace }}"
             labels: "{{ default_vm_labels }}"
           data:
             ssh-public-key: "{{ vm_ssh_key | b64encode }}"
@@ -195,7 +203,7 @@
       metadata:
         name: "{{ compute_instance_name }}-root-disk"
         labels: "{{ default_vm_labels }}"
-        namespace: "{{ compute_instance_working_namespace }}"
+        namespace: "{{ vm_target_namespace }}"
       spec:
         source:
           registry:
@@ -219,7 +227,7 @@
       metadata:
         name: "{{ compute_instance_name }}-disk-{{ idx + 1 }}"
         labels: "{{ default_vm_labels }}"
-        namespace: "{{ compute_instance_working_namespace }}"
+        namespace: "{{ vm_target_namespace }}"
       spec:
         source:
           blank: {}
@@ -265,7 +273,7 @@
       kind: VirtualMachine
       metadata:
         name: "{{ compute_instance_name }}"
-        namespace: "{{ compute_instance_working_namespace }}"
+        namespace: "{{ vm_target_namespace }}"
         labels: "{{ default_vm_labels }}"
       spec:
         runStrategy: "{{ vm_run_strategy }}"
@@ -277,7 +285,7 @@
 
 - name: Show VM Namespace and VM Name
   ansible.builtin.debug:
-    msg: "Namespace {{ compute_instance_working_namespace }} - Name: {{ compute_instance_name }}"
+    msg: "Namespace {{ vm_target_namespace }} - Name: {{ compute_instance_name }}"
 
 - name: Wait for VM to be ready
   kubernetes.core.k8s_info:
@@ -285,7 +293,7 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
-    namespace: "{{ compute_instance_working_namespace }}"
+    namespace: "{{ vm_target_namespace }}"
     wait: true
     wait_condition:
       type: Ready
@@ -311,14 +319,14 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
-    namespace: "{{ compute_instance_working_namespace }}"
+    namespace: "{{ vm_target_namespace }}"
   register: vm_status
 
 - name: Display VM information
   ansible.builtin.debug:
     msg:
       - "Virtual Machine '{{ compute_instance_name }}' created successfully"
-      - "Namespace: {{ compute_instance_working_namespace }}"
+      - "Namespace: {{ vm_target_namespace }}"
       - "Image: {{ vm_image_source }}"
       - "CPU Cores: {{ vm_cpu_cores }}/Memory: {{ vm_memory }}"
       - "Root Disk Size: {{ vm_boot_disk_size }}"
