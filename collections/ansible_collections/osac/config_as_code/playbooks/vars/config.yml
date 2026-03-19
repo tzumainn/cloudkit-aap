@@ -15,3 +15,4 @@ aap_ee_image: "{{ lookup('env', 'AAP_EE_IMAGE', default='ghcr.io/osac-project/os
 license_manifest_path: "{{ lookup('env', 'LICENSE_MANIFEST_PATH', default='/var/secrets/config-as-code-manifest/license.zip') }}"
 remote_cluster_kubeconfig_secret_name: "{{ lookup('env', 'REMOTE_CLUSTER_KUBECONFIG_SECRET_NAME', default='') }}"
 remote_cluster_kubeconfig_secret_key: "{{ lookup('env', 'REMOTE_CLUSTER_KUBECONFIG_SECRET_KEY', default='kubeconfig') }}"
+osac_publish_templates_enabled: "{{ lookup('env', 'OSAC_PUBLISH_TEMPLATES_ENABLED', default='true') | bool }}"

@@ -455,6 +455,7 @@ controller_schedules: # noqa: var-naming[no-role-prefix]
     organization: "{{ aap_organization_name }}"
     unified_job_template: "{{ aap_prefix }}-publish-templates"
     rrule: "DTSTART:20250513T111500Z RRULE:FREQ=MINUTELY;INTERVAL=30"
+    enabled: "{{ osac_publish_templates_enabled }}"
 
 # Create custom execution environments
 controller_execution_environments: # noqa: var-naming[no-role-prefix]

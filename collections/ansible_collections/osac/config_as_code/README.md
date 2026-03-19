@@ -36,6 +36,7 @@ where applicable):
 | `LICENSE_MANIFEST_PATH` | Path to the license manifest file to register the AAP instance ([Red Hat account](https://access.redhat.com/management/subscription_allocations)) | `/var/secrets/config-as-code-manifest/license.zip` |
 | `REMOTE_CLUSTER_KUBECONFIG_SECRET_NAME` | Name of the secret holding the kubeconfig for the remote cluster (cluster fulfillment only) | — |
 | `REMOTE_CLUSTER_KUBECONFIG_SECRET_KEY` | Key within that secret for the kubeconfig file | `kubeconfig` |
+| `OSAC_PUBLISH_TEMPLATES_ENABLED` | Whether the periodic **publish-templates** schedule is enabled in Controller (`true`/`false`) | `true` |
 
 These variables must be defined in a secret named `config-as-code-ig` in the
 namespace where AAP is deployed.
