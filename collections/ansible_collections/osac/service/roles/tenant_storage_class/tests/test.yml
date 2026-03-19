@@ -75,7 +75,8 @@
   gather_facts: false
 
   tasks:
-    - when: test_tenant_name_missing is defined
+    - name: Run no-SC failure test when test_tenant_name_missing is defined
+      when: test_tenant_name_missing is defined
       block:
         - name: Attempt to discover StorageClass for tenant with no SC at all (expected to fail)
           ansible.builtin.include_role:
