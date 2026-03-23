@@ -15,6 +15,15 @@
     kubeconfig: "{{ kubeconfig if (kubeconfig is defined and kubeconfig | length > 0) else omit }}"
   register: tenant_storage_classes
 
+- name: Fail if multiple StorageClasses found for tenant
+  ansible.builtin.fail:
+    msg: >-
+      Found {{ tenant_storage_classes.resources | length }} StorageClasses
+      for tenant '{{ tenant_storage_class_tenant_name }}':
+      {{ tenant_storage_classes.resources | map(attribute='metadata.name') | list | join(', ') }}.
+      Exactly one is required. Remove the extras to resolve.
+  when: tenant_storage_classes.resources | length > 1
+
 - name: Query shared (Default) StorageClass as fallback
   kubernetes.core.k8s_info:
     api_version: storage.k8s.io/v1
@@ -24,6 +33,18 @@
     kubeconfig: "{{ kubeconfig if (kubeconfig is defined and kubeconfig | length > 0) else omit }}"
   register: default_storage_classes
   when: tenant_storage_classes.resources | length == 0
+
+- name: Fail if multiple shared Default StorageClasses found
+  ansible.builtin.fail:
+    msg: >-
+      Found {{ default_storage_classes.resources | length }} shared Default
+      StorageClasses:
+      {{ default_storage_classes.resources | map(attribute='metadata.name') | list | join(', ') }}.
+      Exactly one is required. Remove the extras to resolve.
+  when:
+    - tenant_storage_classes.resources | length == 0
+    - default_storage_classes.resources is defined
+    - default_storage_classes.resources | length > 1
 
 - name: Warn when using shared StorageClass
   ansible.builtin.debug:

@@ -11,6 +11,14 @@
 #
 #   Test A3 (no SCs at all — error path, requires Default SC deleted first):
 #     ansible-playbook ... -e test_tenant_name_missing=tenant-akshay
+#
+#   Test A4 (duplicate tenant SCs — error path):
+#     Prerequisites: Two+ StorageClasses labeled osac.openshift.io/tenant=<name>
+#     ansible-playbook ... -e test_tenant_duplicate_sc=tenant-akshay
+#
+#   Test A5 (duplicate Default SCs — error path, no tenant SC):
+#     Prerequisites: No tenant SC; two+ SCs labeled osac.openshift.io/tenant=Default
+#     ansible-playbook ... -e test_default_duplicate_sc=tenant-akshay
 
 - name: Test tenant_storage_class role
   hosts: localhost
@@ -93,5 +101,71 @@
           ansible.builtin.assert:
             that:
               - "'No StorageClass found' in ansible_failed_result.msg"
+            fail_msg: "Role failed but with unexpected message: {{ ansible_failed_result.msg }}"
+            success_msg: "Role failed as expected: {{ ansible_failed_result.msg }}"
+
+# ──────────────────────────────────────────────────────────────
+# Test: Multiple tenant-specific StorageClasses (should fail)
+# Prerequisites: Cluster has 2+ SCs with osac.openshift.io/tenant=<test_tenant_duplicate_sc>
+# Expected: role fails mentioning multiple SCs and "Exactly one is required"
+# Run: ansible-playbook ... -e test_tenant_duplicate_sc=tenant-akshay
+# ──────────────────────────────────────────────────────────────
+- name: Test tenant_storage_class role — duplicate tenant SCs (should fail)
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Run duplicate-tenant-SC failure test when test_tenant_duplicate_sc is defined
+      when: test_tenant_duplicate_sc is defined
+      block:
+        - name: Attempt discovery with duplicate tenant SCs (expected to fail)
+          ansible.builtin.include_role:
+            name: osac.service.tenant_storage_class
+          vars:
+            tenant_storage_class_tenant_name: "{{ test_tenant_duplicate_sc }}"
+
+        - name: This task should not be reached — role should have failed
+          ansible.builtin.fail:
+            msg: "Role did not fail as expected when duplicate tenant SCs exist"
+
+      rescue:
+        - name: Verify role failed with expected duplicate-tenant message
+          ansible.builtin.assert:
+            that:
+              - "'Exactly one is required' in ansible_failed_result.msg"
+              - "'StorageClasses' in ansible_failed_result.msg or 'StorageClass' in ansible_failed_result.msg"
+            fail_msg: "Role failed but with unexpected message: {{ ansible_failed_result.msg }}"
+            success_msg: "Role failed as expected: {{ ansible_failed_result.msg }}"
+
+# ──────────────────────────────────────────────────────────────
+# Test: Multiple shared Default StorageClasses (should fail)
+# Prerequisites: No tenant SC for tenant; 2+ SCs labeled osac.openshift.io/tenant=Default
+# Expected: role fails mentioning multiple Default SCs and "Exactly one is required"
+# Run: ansible-playbook ... -e test_default_duplicate_sc=tenant-akshay
+# ──────────────────────────────────────────────────────────────
+- name: Test tenant_storage_class role — duplicate Default SCs (should fail)
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Run duplicate-default-SC failure test when test_default_duplicate_sc is defined
+      when: test_default_duplicate_sc is defined
+      block:
+        - name: Attempt discovery with duplicate Default SCs (expected to fail)
+          ansible.builtin.include_role:
+            name: osac.service.tenant_storage_class
+          vars:
+            tenant_storage_class_tenant_name: "{{ test_default_duplicate_sc }}"
+
+        - name: This task should not be reached — role should have failed
+          ansible.builtin.fail:
+            msg: "Role did not fail as expected when duplicate Default SCs exist"
+
+      rescue:
+        - name: Verify role failed with expected duplicate-Default message
+          ansible.builtin.assert:
+            that:
+              - "'Exactly one is required' in ansible_failed_result.msg"
+              - "'StorageClasses' in ansible_failed_result.msg or 'Default' in ansible_failed_result.msg"
             fail_msg: "Role failed but with unexpected message: {{ ansible_failed_result.msg }}"
             success_msg: "Role failed as expected: {{ ansible_failed_result.msg }}"
