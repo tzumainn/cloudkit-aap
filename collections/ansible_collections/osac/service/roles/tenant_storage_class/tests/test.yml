@@ -1,35 +1,47 @@
 ---
 # Test playbook for osac.service.tenant_storage_class role.
-# Each play is guarded by a `when` condition — only the play whose controlling
-# variable is defined will run. Pass exactly one variable per invocation:
+# Each play is guarded by a `when` condition -- only the play whose controlling
+# variable is defined will run. Pass exactly one variable per invocation.
 #
-#   Test A1 (tenant SC exists):
-#     ansible-playbook ... -e test_tenant_name=tenant-akshay
+# All tests require the management cluster context to be active (kubeconfig for
+# the management cluster, not the VM cluster). The role reads from Tenant status,
+# which lives on the management cluster.
 #
-#   Test A2 (no tenant SC, Default SC exists — fallback):
-#     ansible-playbook ... -e test_tenant_name_no_sc=tenant-akshay
+# Required variables for every test:
+#   test_tenant_name|test_tenant_name_*:  The Tenant name to look up.
+#   test_tenant_namespace:                The namespace of the Tenant CR.
 #
-#   Test A3 (no SCs at all — error path, requires Default SC deleted first):
-#     ansible-playbook ... -e test_tenant_name_missing=tenant-akshay
+#   Test B1 (tenant Ready with storageClass set):
+#     Prerequisites: Tenant exists, phase=Ready, status.storageClass is set
+#     ansible-playbook ... -e test_tenant_name=tenant-akshay -e test_tenant_namespace=osac
 #
-#   Test A4 (duplicate tenant SCs — error path):
-#     Prerequisites: Two+ StorageClasses labeled osac.openshift.io/tenant=<name>
-#     ansible-playbook ... -e test_tenant_duplicate_sc=tenant-akshay
+#   Test B2 (tenant not ready -- Progressing phase):
+#     Prerequisites: Tenant exists but phase != Ready (e.g. duplicate SCs configured)
+#     ansible-playbook ... -e test_tenant_name_not_ready=tenant-akshay -e test_tenant_namespace=osac
 #
-#   Test A5 (duplicate Default SCs — error path, no tenant SC):
-#     Prerequisites: No tenant SC; two+ SCs labeled osac.openshift.io/tenant=Default
-#     ansible-playbook ... -e test_default_duplicate_sc=tenant-akshay
+#   Test B3 (tenant not found):
+#     Prerequisites: Tenant with the given name does not exist in the namespace
+#     ansible-playbook ... -e test_tenant_name_missing=tenant-nonexistent -e test_tenant_namespace=osac
+#
+#   Test B4 (tenant ready but storageClass empty -- unexpected edge case):
+#     Prerequisites: Tenant phase=Ready but status.storageClass is empty (misconfigured)
+#     ansible-playbook ... -e test_tenant_name_no_sc=tenant-akshay -e test_tenant_namespace=osac
 
-- name: Test tenant_storage_class role
+# ──────────────────────────────────────────────────────────────
+# Test B1: Tenant ready with storageClass set (happy path)
+# Expected: role succeeds, tenant_storage_class_name set to the SC name from tenant status
+# ──────────────────────────────────────────────────────────────
+- name: Test tenant_storage_class role -- tenant ready with storageClass
   hosts: localhost
   gather_facts: false
 
   tasks:
-    - name: Discover StorageClass for tenant
+    - name: Discover StorageClass for ready tenant
       ansible.builtin.include_role:
         name: osac.service.tenant_storage_class
       vars:
         tenant_storage_class_tenant_name: "{{ test_tenant_name }}"
+        tenant_storage_class_tenant_namespace: "{{ test_tenant_namespace }}"
       when: test_tenant_name is defined
 
     - name: Verify discovered StorageClass name is set
@@ -42,130 +54,94 @@
       when: test_tenant_name is defined
 
 # ──────────────────────────────────────────────────────────────
-# Test: Shared SC fallback
-# Prerequisites: No SC labeled osac.openshift.io/tenant=<test_tenant_name_no_sc>
-#                on the cluster, but one SC labeled osac.openshift.io/tenant=Default
-#                exists.
-# Expected: role succeeds, tenant_storage_class_name set to the Default SC name,
-#           WARNING message logged about storage not being isolated.
-# Run: ansible-playbook ... -e test_tenant_name_no_sc=tenant-akshay
+# Test B2: Tenant not ready (Progressing phase) -- error path
+# Expected: role fails with "not ready" message including phase
 # ──────────────────────────────────────────────────────────────
-- name: Test tenant_storage_class role — shared Default SC fallback
+- name: Test tenant_storage_class role -- tenant not ready (should fail)
   hosts: localhost
   gather_facts: false
 
   tasks:
-    - name: Discover StorageClass for tenant with no dedicated SC (should fall back to Default)
-      ansible.builtin.include_role:
-        name: osac.service.tenant_storage_class
-      vars:
-        tenant_storage_class_tenant_name: "{{ test_tenant_name_no_sc }}"
-      when: test_tenant_name_no_sc is defined
+    - name: Run not-ready failure test when test_tenant_name_not_ready is defined
+      when: test_tenant_name_not_ready is defined
+      block:
+        - name: Attempt to discover StorageClass for not-ready tenant (expected to fail)
+          ansible.builtin.include_role:
+            name: osac.service.tenant_storage_class
+          vars:
+            tenant_storage_class_tenant_name: "{{ test_tenant_name_not_ready }}"
+            tenant_storage_class_tenant_namespace: "{{ test_tenant_namespace }}"
 
-    - name: Verify discovered StorageClass name is set (from Default SC)
-      ansible.builtin.assert:
-        that:
-          - tenant_storage_class_name is defined
-          - tenant_storage_class_name | length > 0
-        fail_msg: "Role did not set tenant_storage_class_name when falling back to Default SC"
-        success_msg: "Discovered shared StorageClass: {{ tenant_storage_class_name }}"
-      when: test_tenant_name_no_sc is defined
+        - name: This task should not be reached -- role should have failed
+          ansible.builtin.fail:
+            msg: "Role did not fail as expected when tenant is not ready"
+
+      rescue:
+        - name: Verify role failed with expected not-ready message
+          ansible.builtin.assert:
+            that:
+              - "'is not ready' in ansible_failed_result.msg"
+            fail_msg: "Role failed but with unexpected message: {{ ansible_failed_result.msg }}"
+            success_msg: "Role failed as expected: {{ ansible_failed_result.msg }}"
 
 # ──────────────────────────────────────────────────────────────
-# Test: Neither tenant SC nor Default SC exists (error path)
-# Prerequisites: No SC labeled with the tenant name and no SC labeled
-#                osac.openshift.io/tenant=Default on the cluster.
-# Expected: role fails with "No StorageClass found" message.
-# Run: ansible-playbook ... -e test_tenant_name_missing=tenant-akshay
+# Test B3: Tenant not found -- error path
+# Expected: role fails with "not found" message
 # ──────────────────────────────────────────────────────────────
-- name: Test tenant_storage_class role — no SC at all (should fail)
+- name: Test tenant_storage_class role -- tenant not found (should fail)
   hosts: localhost
   gather_facts: false
 
   tasks:
-    - name: Run no-SC failure test when test_tenant_name_missing is defined
+    - name: Run tenant-not-found failure test when test_tenant_name_missing is defined
       when: test_tenant_name_missing is defined
       block:
-        - name: Attempt to discover StorageClass for tenant with no SC at all (expected to fail)
+        - name: Attempt to discover StorageClass for missing tenant (expected to fail)
           ansible.builtin.include_role:
             name: osac.service.tenant_storage_class
           vars:
             tenant_storage_class_tenant_name: "{{ test_tenant_name_missing }}"
+            tenant_storage_class_tenant_namespace: "{{ test_tenant_namespace }}"
 
-        - name: This task should not be reached — role should have failed
+        - name: This task should not be reached -- role should have failed
           ansible.builtin.fail:
-            msg: "Role did not fail as expected when no SC exists"
+            msg: "Role did not fail as expected when tenant is not found"
 
       rescue:
-        - name: Verify role failed with expected message
+        - name: Verify role failed with expected not-found message
           ansible.builtin.assert:
             that:
-              - "'No StorageClass found' in ansible_failed_result.msg"
+              - "'not found' in ansible_failed_result.msg"
             fail_msg: "Role failed but with unexpected message: {{ ansible_failed_result.msg }}"
             success_msg: "Role failed as expected: {{ ansible_failed_result.msg }}"
 
 # ──────────────────────────────────────────────────────────────
-# Test: Multiple tenant-specific StorageClasses (should fail)
-# Prerequisites: Cluster has 2+ SCs with osac.openshift.io/tenant=<test_tenant_duplicate_sc>
-# Expected: role fails mentioning multiple SCs and "Exactly one is required"
-# Run: ansible-playbook ... -e test_tenant_duplicate_sc=tenant-akshay
+# Test B4: Tenant ready but storageClass empty -- error path
+# Expected: role fails with "storageClass is empty" message
 # ──────────────────────────────────────────────────────────────
-- name: Test tenant_storage_class role — duplicate tenant SCs (should fail)
+- name: Test tenant_storage_class role -- tenant ready but storageClass empty (should fail)
   hosts: localhost
   gather_facts: false
 
   tasks:
-    - name: Run duplicate-tenant-SC failure test when test_tenant_duplicate_sc is defined
-      when: test_tenant_duplicate_sc is defined
+    - name: Run empty-storageClass failure test when test_tenant_name_no_sc is defined
+      when: test_tenant_name_no_sc is defined
       block:
-        - name: Attempt discovery with duplicate tenant SCs (expected to fail)
+        - name: Attempt to discover StorageClass when tenant storageClass is empty (expected to fail)
           ansible.builtin.include_role:
             name: osac.service.tenant_storage_class
           vars:
-            tenant_storage_class_tenant_name: "{{ test_tenant_duplicate_sc }}"
+            tenant_storage_class_tenant_name: "{{ test_tenant_name_no_sc }}"
+            tenant_storage_class_tenant_namespace: "{{ test_tenant_namespace }}"
 
-        - name: This task should not be reached — role should have failed
+        - name: This task should not be reached -- role should have failed
           ansible.builtin.fail:
-            msg: "Role did not fail as expected when duplicate tenant SCs exist"
+            msg: "Role did not fail as expected when tenant storageClass is empty"
 
       rescue:
-        - name: Verify role failed with expected duplicate-tenant message
+        - name: Verify role failed with expected empty-storageClass message
           ansible.builtin.assert:
             that:
-              - "'Exactly one is required' in ansible_failed_result.msg"
-              - "'StorageClasses' in ansible_failed_result.msg or 'StorageClass' in ansible_failed_result.msg"
-            fail_msg: "Role failed but with unexpected message: {{ ansible_failed_result.msg }}"
-            success_msg: "Role failed as expected: {{ ansible_failed_result.msg }}"
-
-# ──────────────────────────────────────────────────────────────
-# Test: Multiple shared Default StorageClasses (should fail)
-# Prerequisites: No tenant SC for tenant; 2+ SCs labeled osac.openshift.io/tenant=Default
-# Expected: role fails mentioning multiple Default SCs and "Exactly one is required"
-# Run: ansible-playbook ... -e test_default_duplicate_sc=tenant-akshay
-# ──────────────────────────────────────────────────────────────
-- name: Test tenant_storage_class role — duplicate Default SCs (should fail)
-  hosts: localhost
-  gather_facts: false
-
-  tasks:
-    - name: Run duplicate-default-SC failure test when test_default_duplicate_sc is defined
-      when: test_default_duplicate_sc is defined
-      block:
-        - name: Attempt discovery with duplicate Default SCs (expected to fail)
-          ansible.builtin.include_role:
-            name: osac.service.tenant_storage_class
-          vars:
-            tenant_storage_class_tenant_name: "{{ test_default_duplicate_sc }}"
-
-        - name: This task should not be reached — role should have failed
-          ansible.builtin.fail:
-            msg: "Role did not fail as expected when duplicate Default SCs exist"
-
-      rescue:
-        - name: Verify role failed with expected duplicate-Default message
-          ansible.builtin.assert:
-            that:
-              - "'Exactly one is required' in ansible_failed_result.msg"
-              - "'StorageClasses' in ansible_failed_result.msg or 'Default' in ansible_failed_result.msg"
+              - "'storageClass is empty' in ansible_failed_result.msg"
             fail_msg: "Role failed but with unexpected message: {{ ansible_failed_result.msg }}"
             success_msg: "Role failed as expected: {{ ansible_failed_result.msg }}"

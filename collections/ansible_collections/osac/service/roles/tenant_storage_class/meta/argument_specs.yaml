@@ -4,8 +4,8 @@ argument_specs:
       tenant_storage_class_tenant_name:
         type: str
         required: true
-        description: "Tenant name (e.g. from compute_instance.status.tenantReference.name) used to discover the tenant's default StorageClass via label osac.openshift.io/tenant."
-      kubeconfig:
+        description: "Tenant name (e.g. from compute_instance.status.tenantReference.name) used to look up the Tenant CR."
+      tenant_storage_class_tenant_namespace:
         type: str
-        required: false
-        description: "Kubeconfig content or path for the VM cluster where StorageClasses are queried (e.g. from OSAC_REMOTE_CLUSTER_KUBECONFIG). When not set or empty, the management cluster context is used."
+        required: true
+        description: "Namespace of the Tenant CR on the management cluster (e.g. from compute_instance.status.tenantReference.namespace)."
