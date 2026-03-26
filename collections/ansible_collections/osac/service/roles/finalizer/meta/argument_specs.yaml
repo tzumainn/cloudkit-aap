@@ -22,7 +22,7 @@ argument_specs:
             required: true
           namespace:
             type: str
-            required: true
+            required: false
           name:
             type: str
             required: true
