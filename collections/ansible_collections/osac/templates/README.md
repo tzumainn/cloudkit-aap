@@ -20,17 +20,19 @@ OSAC [fulfillment service](https://github.com/osac-project/fulfillment-service).
 
 ## Installation
 
-### From Ansible Galaxy
+This collection is maintained as part of the [osac-aap](https://github.com/osac-project/osac-aap) repository and is automatically available when working within that repository.
+
+### For Development
+
+When working within the osac-aap repository, the collection is automatically available from the `collections/` directory. No installation is required.
+
+### For System-wide Installation
+
+To install the collection system-wide from source:
 
 ```bash
-ansible-galaxy collection install osac.templates
-```
-
-### From Source
-
-```bash
-git clone http://github.com/osac-project/osac-templates
-cd osac-templates
+git clone https://github.com/osac-project/osac-aap
+cd osac-aap/collections/ansible_collections/osac/templates
 ansible-galaxy collection build
 ansible-galaxy collection install osac-templates-*.tar.gz
 ```
@@ -176,9 +178,9 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
 ## Support
 
-- **Issues**: http://github.com/osac-project/issues/issues
-- **Documentation**: http://github.com/osac-project/osac-templates/README.md
-- **Repository**: http://github.com/osac-project/osac-templates
+- **Issues**: https://github.com/osac-project/osac-aap/issues
+- **Documentation**: https://github.com/osac-project/osac-aap
+- **Repository**: https://github.com/osac-project/osac-aap
 
 ## Author
 
