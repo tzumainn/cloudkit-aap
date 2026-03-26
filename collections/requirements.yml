@@ -19,9 +19,6 @@ collections:
     version: "2.8.2"
   - name: infra.aap_configuration
     version: "3.4.1"
-  - name: osac.templates
-    type: git
-    source: https://github.com/osac-project/osac-templates
   - name: osac.massopencloud
     type: git
     source: https://github.com/osac-project/osac-massopencloud-templates
