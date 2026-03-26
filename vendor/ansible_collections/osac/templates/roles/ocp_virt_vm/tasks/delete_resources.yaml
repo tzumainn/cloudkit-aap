@@ -28,7 +28,7 @@
     definition:
       spec:
         runStrategy: Halted
-  when: vm_exists.resources
+  when: vm_exists.resources | length > 0
 
 - name: Wait for VM to stop
   kubernetes.core.k8s_info:
@@ -42,7 +42,7 @@
       type: Ready
       status: "False"
     wait_timeout: 300
-  when: vm_exists.resources
+  when: vm_exists.resources | length > 0
 
 - name: Delete VirtualMachine
   kubernetes.core.k8s:
