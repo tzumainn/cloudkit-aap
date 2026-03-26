@@ -60,4 +60,4 @@ jobs:
           install_only: true
 
       - name: Run integration tests
-        run: make test
+        run: uv run make test
