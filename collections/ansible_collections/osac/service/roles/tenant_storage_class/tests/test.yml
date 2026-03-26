@@ -62,8 +62,10 @@
   gather_facts: false
 
   tasks:
-    - name: Run not-ready failure test when test_tenant_name_not_ready is defined
-      when: test_tenant_name_not_ready is defined
+    - name: Run not-ready failure test
+      when:
+        - test_tenant_name_not_ready is defined
+        - test_tenant_namespace is defined
       block:
         - name: Attempt to discover StorageClass for not-ready tenant (expected to fail)
           ansible.builtin.include_role:
@@ -93,8 +95,10 @@
   gather_facts: false
 
   tasks:
-    - name: Run tenant-not-found failure test when test_tenant_name_missing is defined
-      when: test_tenant_name_missing is defined
+    - name: Run tenant-not-found failure test
+      when:
+        - test_tenant_name_missing is defined
+        - test_tenant_namespace is defined
       block:
         - name: Attempt to discover StorageClass for missing tenant (expected to fail)
           ansible.builtin.include_role:
@@ -124,8 +128,10 @@
   gather_facts: false
 
   tasks:
-    - name: Run empty-storageClass failure test when test_tenant_name_no_sc is defined
-      when: test_tenant_name_no_sc is defined
+    - name: Run empty-storageClass failure test
+      when:
+        - test_tenant_name_no_sc is defined
+        - test_tenant_namespace is defined
       block:
         - name: Attempt to discover StorageClass when tenant storageClass is empty (expected to fail)
           ansible.builtin.include_role:
