@@ -3,6 +3,10 @@
 default_subnet_labels:
   osac.io/managed-by: osac-fulfillment
 
+# SecurityGroup NetworkPolicy defaults
+default_security_group_labels:
+  osac.io/managed-by: osac-fulfillment
+
 # Layer2 defaults
 default_layer2_role: Primary
 default_ipam_lifecycle: Persistent

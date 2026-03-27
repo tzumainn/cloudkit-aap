@@ -53,3 +53,22 @@ argument_specs:
         type: str
         required: true
         description: Name of the VirtualNetwork resource
+
+  create_security_group:
+    options:
+      security_group:
+        type: dict
+        required: true
+        description: SecurityGroup CR from fulfillment-api via EDA payload
+      template_parameters:
+        type: dict
+        description: Template-specific parameters (reserved for future use)
+        options: {}
+        default: {}
+
+  delete_security_group:
+    options:
+      security_group:
+        type: dict
+        required: true
+        description: SecurityGroup CR from fulfillment-api via EDA payload
