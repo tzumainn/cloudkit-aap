@@ -20,22 +20,25 @@
       ansible.builtin.include_role:
         name: osac.service.compute_instance_working_namespace
 
-    # VM cluster kubeconfig for tenant StorageClass discovery and template.
-    # When unset or empty, the management cluster is used as the VM cluster.
-    - name: Set VM cluster kubeconfig from environment
-      ansible.builtin.set_fact:
-        remote_cluster_kubeconfig: "{{ lookup('env', 'OSAC_REMOTE_CLUSTER_KUBECONFIG') | default('', true) }}"
+    # Discover tenant StorageClass from Tenant status; sets tenant_storage_class_name
+    - name: Fail if tenant reference is missing
+      ansible.builtin.fail:
+        msg: >-
+          ComputeInstance '{{ compute_instance_name }}' has no tenantReference in status.
+          The osac-operator CI controller should set this before triggering provisioning.
+      when: >-
+        compute_instance.status.tenantReference is not defined or
+        compute_instance.status.tenantReference.name is not defined or
+        compute_instance.status.tenantReference.name | length == 0 or
+        compute_instance.status.tenantReference.namespace is not defined or
+        compute_instance.status.tenantReference.namespace | length == 0
 
-    # Discover tenant StorageClass on VM cluster; sets tenant_storage_class_name
-    - name: Discover tenant StorageClass
+    - name: Discover tenant StorageClass from Tenant status
       ansible.builtin.include_role:
         name: osac.service.tenant_storage_class
       vars:
         tenant_storage_class_tenant_name: "{{ compute_instance.status.tenantReference.name }}"
-        kubeconfig: "{{ remote_cluster_kubeconfig if (remote_cluster_kubeconfig | length > 0) else omit }}"
-      when:
-        - compute_instance.status.tenantReference is defined
-        - compute_instance.status.tenantReference.name is defined
+        tenant_storage_class_tenant_namespace: "{{ compute_instance.status.tenantReference.namespace }}"
 
   tasks:
 
