@@ -25,6 +25,7 @@ WORKFLOWS=(
   "cluster_delete"
   "cluster_post_install"
   "compute_instance_create"
+  "compute_instance_with_gpu_create"
   "compute_instance_delete"
   "hostpool_create"
   "hostpool_delete"
@@ -50,23 +51,27 @@ for workflow in "${WORKFLOWS[@]}"; do
     FAILED+=("$workflow:baseline")
   fi
 
-  # Override test
-  echo "  [2/2] Running override test..."
-  # Clear override log
-  > /tmp/osac_test_overrides.log
+  # Override test (skip if no overrides playbook exists)
+  if [ -f "targets/${workflow}/tasks/overrides.yml" ]; then
+    echo "  [2/2] Running override test..."
+    # Clear override log
+    > /tmp/osac_test_overrides.log
 
-  if ansible-playbook "targets/${workflow}/tasks/overrides.yml" -e "@common_vars.yml" -v; then
-    # Verify override log has entries
-    if [ -s /tmp/osac_test_overrides.log ]; then
-      echo "  ✓ Override test passed"
-      PASSED+=("$workflow:overrides")
+    if ansible-playbook "targets/${workflow}/tasks/overrides.yml" -e "@common_vars.yml" -v; then
+      # Verify override log has entries
+      if [ -s /tmp/osac_test_overrides.log ]; then
+        echo "  ✓ Override test passed"
+        PASSED+=("$workflow:overrides")
+      else
+        echo "  ✗ Override test failed (no override log entries)"
+        FAILED+=("$workflow:overrides-no-log")
+      fi
     else
-      echo "  ✗ Override test failed (no override log entries)"
-      FAILED+=("$workflow:overrides-no-log")
+      echo "  ✗ Override test failed"
+      FAILED+=("$workflow:overrides")
     fi
   else
-    echo "  ✗ Override test failed"
-    FAILED+=("$workflow:overrides")
+    echo "  [2/2] No override test (skipped)"
   fi
 
   echo ""
