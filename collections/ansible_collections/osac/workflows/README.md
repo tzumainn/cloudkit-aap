@@ -23,13 +23,8 @@ The osac.workflows collection contains orchestration playbooks for cluster provi
 - `osac.workflows.compute_instance.create` - Create compute instance/VM
 - `osac.workflows.compute_instance.delete` - Delete compute instance
 
-### Hostpool Workflows
-- `osac.workflows.hostpool.create` - Create host pool infrastructure
-- `osac.workflows.hostpool.delete` - Delete host pool
-
 ### Reporting Workflows
 - `osac.workflows.reporting.report_cluster_status` - Report cluster status
-- `osac.workflows.reporting.report_hostpool_status` - Report hostpool status
 
 ## Usage
 

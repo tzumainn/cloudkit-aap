@@ -209,7 +209,6 @@ The following tasks **cannot be tested without real infrastructure**:
 ### OpenStack/ESI Resources
 - `osac.service.cluster_infra` - Creates bare metal hosts via OpenStack Ironic
 - Requires OpenStack auth_url and credentials
-- Used by: hostpool_create, hostpool_delete
 
 ### AAP Resources
 - Not currently used by any workflows in the collection
@@ -236,7 +235,3 @@ The following tasks **cannot be tested without real infrastructure**:
 - ⚠️ cluster_create override (test_template has extra hooks not in real template)
 - ⚠️ cluster_delete override (test_template has extra hooks not in real template)
 - ⚠️ cluster_post_install override (test_template has extra hooks not in real template)
-
-### Require External Infrastructure
-- ❌ hostpool_create (requires OpenStack)
-- ❌ hostpool_delete (requires OpenStack)

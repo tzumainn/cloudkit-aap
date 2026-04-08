@@ -26,10 +26,7 @@ WORKFLOWS=(
   "cluster_post_install"
   "compute_instance_create"
   "compute_instance_delete"
-  "hostpool_create"
-  "hostpool_delete"
   "cluster_status_reporting"
-  "hostpool_status_reporting"
 )
 
 echo "=== Running Integration Tests ==="

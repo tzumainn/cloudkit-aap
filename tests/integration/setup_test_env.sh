@@ -82,7 +82,6 @@ kubectl create namespace osac-system || true
 kubectl create namespace osac-workflows-test || true
 kubectl create namespace cluster-test-cluster-work || true
 kubectl create namespace computeinstance-test-vm-work || true
-kubectl create namespace hostpool-test-hostpool-work || true
 
 # 5. Apply test fixtures
 echo "Applying test fixtures..."
