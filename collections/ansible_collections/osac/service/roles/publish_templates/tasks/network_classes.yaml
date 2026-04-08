@@ -12,7 +12,7 @@
       {{
       network_class_check | json_query("json.items[].id")
       }}
-  when: network_class_check is success and network_class_check.json.size > 0
+  when: network_class_check is success and (network_class_check.json.size | default(0)) > 0
 
 - name: Update existing NetworkClass
   loop: "{{ osac_network_classes }}"
