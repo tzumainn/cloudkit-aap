@@ -12,9 +12,9 @@ make test
 
 This creates a kind cluster, installs CRDs, runs all tests, and cleans up.
 
-## Current Status: 12/22 Tests Passing
+## Current Status: 10/14 Tests Passing
 
-### ✅ Passing Tests (12)
+### ✅ Passing Tests (10)
 
 **cluster_create** (1/2)
 - ✓ Baseline - Workflow executes, variables extracted, locks acquired
@@ -36,15 +36,11 @@ This creates a kind cluster, installs CRDs, runs all tests, and cleans up.
 - ✓ Baseline - Reports workflow status to ClusterOrder CRD
 - ✓ Override - Workflow hooks execute correctly
 
-**hostpool_status_reporting** (2/2)
-- ✓ Baseline - Reports workflow status to HostPool CRD
-- ✓ Override - Workflow hooks execute correctly
-
 **maintenance_cleanup** (2/2)
 - ✓ Baseline - Executes maintenance workflow (noop by default)
 - ✓ Override - Maintenance step override works correctly
 
-### ❌ Failing Tests (10)
+### ❌ Failing Tests (8)
 
 **Override tests** (4 tests) - Need template-level hooks
 - cluster_create:override - Missing modify_hosted_cluster, modify_nodepool hooks in noop template
@@ -52,9 +48,7 @@ This creates a kind cluster, installs CRDs, runs all tests, and cleans up.
 - compute_instance_create:override - Missing VM creation hooks in noop template
 - compute_instance_delete:override - Missing VM deletion hooks in noop template
 
-**External infrastructure required** (6 tests)
-- hostpool_create (baseline + override) - Requires OpenStack API (ESI network provisioning)
-- hostpool_delete (baseline + override) - Requires OpenStack SDK for cleanup
+**External infrastructure required** (4 tests)
 - config_as_code (baseline + override) - Requires Ansible Automation Platform instance
 
 ## Test Architecture

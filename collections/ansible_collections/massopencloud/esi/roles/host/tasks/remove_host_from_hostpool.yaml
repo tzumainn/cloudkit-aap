@@ -1,3 +1,0 @@
-- name: Unset hostpool for host # noqa:no-changed-when
-  ansible.builtin.command: >-
-    openstack baremetal node unset --extra hostpool {{ host_name }}
