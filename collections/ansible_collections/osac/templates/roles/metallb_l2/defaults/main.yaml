@@ -1,0 +1,4 @@
+---
+# Default labels for MetalLB PublicIPPool resources
+default_publicippool_labels:
+  osac.io/managed-by: osac-fulfillment
