@@ -12,7 +12,7 @@
       {{
       cluster_template_check | json_query("json.items[].id")
       }}
-  when: cluster_template_check is success and (cluster_template_check.json.size | default(0)) > 0
+  when: cluster_template_check is success and cluster_template_check.json.get('items', []) | length > 0
 
 - name: Update existing cluster template
   loop: "{{ osac_cluster_templates }}"
