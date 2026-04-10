@@ -1,41 +1,16 @@
 ---
-# Unit tests for osac.service.finalizer role.
-# Each play is guarded by a `when` condition -- only the play whose controlling
-# variable is defined will run. Pass exactly one variable per invocation.
-#
-# REQUIRES: A Kubernetes cluster (kind or real) with KUBECONFIG set.
-# The test creates and cleans up its own ConfigMap resources in the default namespace.
-#
-# Setup (if using the integration test kind cluster):
-#   cd tests/integration && ./setup_test_env.sh
-#   export KUBECONFIG=$(pwd)/tests/integration/kubeconfig-osac-test
-#
-# Or use any cluster:
-#   export KUBECONFIG=~/.kube/config
-#
-#   Test 1 (add finalizer):
-#     ansible-playbook ... -e test_add_finalizer=true
-#
-#   Test 2 (remove finalizer):
-#     ansible-playbook ... -e test_remove_finalizer=true
-#
-#   Test 3 (add finalizer is idempotent):
-#     ansible-playbook ... -e test_add_idempotent=true
-#
-#   Test 4 (remove nonexistent finalizer -- no error):
-#     ansible-playbook ... -e test_remove_nonexistent=true
+# Integration test for osac.service.finalizer role.
+# Runs all scenarios sequentially: add, remove, idempotent add, remove nonexistent.
 
-# ──────────────────────────────────────────────────────────────
-# Test 1: Add a finalizer to a ConfigMap
-# Expected: finalizer appears in metadata.finalizers
-# ──────────────────────────────────────────────────────────────
-- name: "Test finalizer -- add finalizer"
+# ── Test 1: Add a finalizer ──
+- name: "Finalizer - Test add finalizer"
   hosts: localhost
   gather_facts: false
+  vars_files:
+    - ../../../common_vars.yml
 
   tasks:
-    - name: Run add-finalizer test
-      when: test_add_finalizer | default(false) | bool
+    - name: Test add finalizer
       block:
         - name: Create test ConfigMap
           kubernetes.core.k8s:
@@ -74,8 +49,8 @@
             that:
               - result.resources | length == 1
               - "'osac.openshift.io/test-finalizer' in result.resources[0].metadata.finalizers"
-            fail_msg: "Finalizer not found in: {{ result.resources[0].metadata.finalizers | default([]) }}"
-            success_msg: "Finalizer added successfully"
+            fail_msg: "Finalizer not found"
+            success_msg: "Add finalizer: passed"
 
       always:
         - name: Cleanup -- remove finalizer
@@ -98,17 +73,15 @@
             namespace: default
             name: finalizer-test-add
 
-# ──────────────────────────────────────────────────────────────
-# Test 2: Remove a finalizer from a ConfigMap
-# Expected: finalizer removed, ConfigMap can be deleted
-# ──────────────────────────────────────────────────────────────
-- name: "Test finalizer -- remove finalizer"
+# ── Test 2: Remove a finalizer ──
+- name: "Finalizer - Test remove finalizer"
   hosts: localhost
   gather_facts: false
+  vars_files:
+    - ../../../common_vars.yml
 
   tasks:
-    - name: Run remove-finalizer test
-      when: test_remove_finalizer | default(false) | bool
+    - name: Test remove finalizer
       block:
         - name: Create test ConfigMap with finalizer
           kubernetes.core.k8s:
@@ -149,8 +122,8 @@
             that:
               - result.resources | length == 1
               - "'osac.openshift.io/test-finalizer' not in (result.resources[0].metadata.finalizers | default([]))"
-            fail_msg: "Finalizer still present: {{ result.resources[0].metadata.finalizers | default([]) }}"
-            success_msg: "Finalizer removed successfully"
+            fail_msg: "Finalizer still present"
+            success_msg: "Remove finalizer: passed"
 
       always:
         - name: Cleanup -- delete ConfigMap
@@ -161,17 +134,15 @@
             namespace: default
             name: finalizer-test-remove
 
-# ──────────────────────────────────────────────────────────────
-# Test 3: Adding same finalizer twice is idempotent
-# Expected: finalizer appears only once
-# ──────────────────────────────────────────────────────────────
-- name: "Test finalizer -- add is idempotent"
+# ── Test 3: Add is idempotent ──
+- name: "Finalizer - Test idempotent add"
   hosts: localhost
   gather_facts: false
+  vars_files:
+    - ../../../common_vars.yml
 
   tasks:
-    - name: Run idempotent-add test
-      when: test_add_idempotent | default(false) | bool
+    - name: Test idempotent add
       block:
         - name: Create test ConfigMap with existing finalizer
           kubernetes.core.k8s:
@@ -211,8 +182,8 @@
           ansible.builtin.assert:
             that:
               - result.resources[0].metadata.finalizers | select('equalto', 'osac.openshift.io/test-finalizer') | list | length == 1
-            fail_msg: "Duplicate finalizers: {{ result.resources[0].metadata.finalizers }}"
-            success_msg: "Idempotent add -- finalizer appears exactly once"
+            fail_msg: "Duplicate finalizers found"
+            success_msg: "Idempotent add: passed"
 
       always:
         - name: Cleanup -- remove finalizer
@@ -235,17 +206,15 @@
             namespace: default
             name: finalizer-test-idempotent
 
-# ──────────────────────────────────────────────────────────────
-# Test 4: Remove nonexistent finalizer -- no error
-# Expected: role completes without error, no finalizers on resource
-# ──────────────────────────────────────────────────────────────
-- name: "Test finalizer -- remove nonexistent finalizer"
+# ── Test 4: Remove nonexistent finalizer ──
+- name: "Finalizer - Test remove nonexistent"
   hosts: localhost
   gather_facts: false
+  vars_files:
+    - ../../../common_vars.yml
 
   tasks:
-    - name: Run remove-nonexistent test
-      when: test_remove_nonexistent | default(false) | bool
+    - name: Test remove nonexistent
       block:
         - name: Create test ConfigMap without finalizers
           kubernetes.core.k8s:
@@ -283,8 +252,8 @@
           ansible.builtin.assert:
             that:
               - result.resources[0].metadata.finalizers | default([]) | length == 0
-            fail_msg: "Unexpected finalizers: {{ result.resources[0].metadata.finalizers | default([]) }}"
-            success_msg: "Remove nonexistent finalizer completed without error"
+            fail_msg: "Unexpected finalizers found"
+            success_msg: "Remove nonexistent: passed"
 
       always:
         - name: Cleanup -- delete ConfigMap

@@ -10,7 +10,12 @@ echo "Using kubeconfig: ${KUBECONFIG}"
 # Set Pod environment variables for lease creation (normally set by Kubernetes)
 export POD_NAMESPACE="osac-system"
 export POD_NAME="test-runner"
-export POD_UID="00000000-0000-0000-0000-000000000000"
+# Use real pod UID if available (created by setup_test_env.sh), fall back to placeholder
+if [ -f "${SCRIPT_DIR}/test-runner-uid" ]; then
+  export POD_UID=$(cat "${SCRIPT_DIR}/test-runner-uid")
+else
+  export POD_UID="00000000-0000-0000-0000-000000000000"
+fi
 
 # Suppress inventory parsing warnings
 export ANSIBLE_INVENTORY_UNPARSED_WARNING=False
@@ -30,7 +35,15 @@ WORKFLOWS=(
   "cluster_status_reporting"
 )
 
-echo "=== Running Integration Tests ==="
+# Role-level integration tests (baseline only, no overrides)
+ROLE_TESTS=(
+  "finalizer"
+  "lease"
+  "cluster_working_namespace"
+  "compute_instance_working_namespace"
+)
+
+echo "=== Running Workflow Integration Tests ==="
 echo ""
 
 for workflow in "${WORKFLOWS[@]}"; do
@@ -69,6 +82,25 @@ for workflow in "${WORKFLOWS[@]}"; do
     fi
   else
     echo "  [2/2] No override test (skipped)"
+  fi
+
+  echo ""
+done
+
+echo "=== Running Role Integration Tests ==="
+echo ""
+
+for role in "${ROLE_TESTS[@]}"; do
+  echo "----------------------------------------"
+  echo "Testing role: $role"
+  echo "----------------------------------------"
+
+  if ansible-playbook "targets/${role}/tasks/baseline.yml" -e "@common_vars.yml" -v; then
+    echo "  ✓ Passed"
+    PASSED+=("$role:baseline")
+  else
+    echo "  ✗ Failed"
+    FAILED+=("$role:baseline")
   fi
 
   echo ""
