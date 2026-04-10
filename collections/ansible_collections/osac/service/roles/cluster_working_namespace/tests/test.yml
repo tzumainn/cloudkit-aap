@@ -1,0 +1,135 @@
+---
+# Unit tests for osac.service.cluster_working_namespace role.
+# Each play is guarded by a `when` condition -- only the play whose controlling
+# variable is defined will run. Pass exactly one variable per invocation.
+#
+# REQUIRES: A Kubernetes cluster (kind or real) with KUBECONFIG set and
+# OSAC CRDs installed (for ClusterOrder label references).
+#
+# Setup:
+#   export KUBECONFIG=<path-to-kubeconfig>
+#   # Create test namespace with the expected label:
+#   kubectl create namespace cluster-test-ns-work
+#   kubectl label namespace cluster-test-ns-work osac.openshift.io/clusterorder=test-order
+#
+#   Test 1 (happy path -- namespace found by label):
+#     ansible-playbook ... -e test_found=true
+#
+#   Test 2 (namespace not found -- should fail):
+#     ansible-playbook ... -e test_not_found=true
+#
+#   Test 3 (pre-defined -- role skips lookup):
+#     ansible-playbook ... -e test_predefined=true
+
+# ──────────────────────────────────────────────────────────────
+# Test 1: Namespace found by ClusterOrder label
+# Expected: cluster_working_namespace set to the labeled namespace
+# ──────────────────────────────────────────────────────────────
+- name: "Test cluster_working_namespace -- namespace found by label"
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    cluster_order_label: "osac.openshift.io/clusterorder"
+
+  tasks:
+    - name: Create labeled test namespace
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: cluster-cwn-test-work
+            labels:
+              osac.openshift.io/clusterorder: "cwn-test-order"
+      when: test_found | default(false) | bool
+
+    - name: Run cluster_working_namespace role
+      ansible.builtin.include_role:
+        name: osac.service.cluster_working_namespace
+      vars:
+        cluster_working_namespace_cluster_order_name: "cwn-test-order"
+      when: test_found | default(false) | bool
+
+    - name: Verify namespace resolved
+      ansible.builtin.assert:
+        that:
+          - cluster_working_namespace is defined
+          - cluster_working_namespace == "cluster-cwn-test-work"
+        fail_msg: "Expected 'cluster-cwn-test-work', got '{{ cluster_working_namespace | default('undefined') }}'"
+        success_msg: "Namespace resolved: {{ cluster_working_namespace }}"
+      when: test_found | default(false) | bool
+
+    - name: Cleanup -- delete test namespace
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Namespace
+        name: cluster-cwn-test-work
+      when: test_found | default(false) | bool
+
+# ──────────────────────────────────────────────────────────────
+# Test 2: No namespace matches label -- should fail
+# Expected: role fails with "Working cluster namespace was not found"
+# ──────────────────────────────────────────────────────────────
+- name: "Test cluster_working_namespace -- namespace not found (should fail)"
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    cluster_order_label: "osac.openshift.io/clusterorder"
+
+  tasks:
+    - name: Run not-found failure test
+      when: test_not_found | default(false) | bool
+      block:
+        - name: Run role with nonexistent order name
+          ansible.builtin.include_role:
+            name: osac.service.cluster_working_namespace
+          vars:
+            cluster_working_namespace_cluster_order_name: "nonexistent-order"
+
+        - name: This should not be reached
+          ansible.builtin.fail:
+            msg: "Role did not fail when namespace was not found"
+
+      rescue:
+        - name: Verify role failed with expected message
+          ansible.builtin.assert:
+            that:
+              - "'not found' in ansible_failed_result.msg"
+            fail_msg: "Role failed but with unexpected message: {{ ansible_failed_result.msg }}"
+            success_msg: "Role failed as expected: {{ ansible_failed_result.msg }}"
+
+# ──────────────────────────────────────────────────────────────
+# Test 3: Pre-defined cluster_working_namespace -- role skips
+# Expected: pre-defined value preserved, no K8s lookup
+# ──────────────────────────────────────────────────────────────
+- name: "Test cluster_working_namespace -- pre-defined preserved"
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    cluster_order_label: "osac.openshift.io/clusterorder"
+
+  tasks:
+    - name: Pre-define cluster_working_namespace
+      ansible.builtin.set_fact:
+        cluster_working_namespace: "my-custom-namespace"
+      when: test_predefined | default(false) | bool
+
+    - name: Run role (should skip lookup)
+      ansible.builtin.include_role:
+        name: osac.service.cluster_working_namespace
+      vars:
+        cluster_working_namespace_cluster_order_name: "does-not-matter"
+      when: test_predefined | default(false) | bool
+
+    - name: Verify pre-defined value preserved
+      ansible.builtin.assert:
+        that:
+          - cluster_working_namespace == "my-custom-namespace"
+        fail_msg: "Pre-defined namespace was overwritten: {{ cluster_working_namespace }}"
+        success_msg: "Pre-defined namespace preserved: {{ cluster_working_namespace }}"
+      when: test_predefined | default(false) | bool
