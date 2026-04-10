@@ -33,41 +33,41 @@
     cluster_order_label: "osac.openshift.io/clusterorder"
 
   tasks:
-    - name: Create labeled test namespace
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: v1
-          kind: Namespace
-          metadata:
+    - name: Run namespace-found test
+      when: test_found | default(false) | bool
+      block:
+        - name: Create labeled test namespace
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: cluster-cwn-test-work
+                labels:
+                  osac.openshift.io/clusterorder: "cwn-test-order"
+
+        - name: Run cluster_working_namespace role
+          ansible.builtin.include_role:
+            name: osac.service.cluster_working_namespace
+          vars:
+            cluster_working_namespace_cluster_order_name: "cwn-test-order"
+
+        - name: Verify namespace resolved
+          ansible.builtin.assert:
+            that:
+              - cluster_working_namespace is defined
+              - cluster_working_namespace == "cluster-cwn-test-work"
+            fail_msg: "Expected 'cluster-cwn-test-work', got '{{ cluster_working_namespace | default('undefined') }}'"
+            success_msg: "Namespace resolved: {{ cluster_working_namespace }}"
+
+      always:
+        - name: Cleanup -- delete test namespace
+          kubernetes.core.k8s:
+            state: absent
+            api_version: v1
+            kind: Namespace
             name: cluster-cwn-test-work
-            labels:
-              osac.openshift.io/clusterorder: "cwn-test-order"
-      when: test_found | default(false) | bool
-
-    - name: Run cluster_working_namespace role
-      ansible.builtin.include_role:
-        name: osac.service.cluster_working_namespace
-      vars:
-        cluster_working_namespace_cluster_order_name: "cwn-test-order"
-      when: test_found | default(false) | bool
-
-    - name: Verify namespace resolved
-      ansible.builtin.assert:
-        that:
-          - cluster_working_namespace is defined
-          - cluster_working_namespace == "cluster-cwn-test-work"
-        fail_msg: "Expected 'cluster-cwn-test-work', got '{{ cluster_working_namespace | default('undefined') }}'"
-        success_msg: "Namespace resolved: {{ cluster_working_namespace }}"
-      when: test_found | default(false) | bool
-
-    - name: Cleanup -- delete test namespace
-      kubernetes.core.k8s:
-        state: absent
-        api_version: v1
-        kind: Namespace
-        name: cluster-cwn-test-work
-      when: test_found | default(false) | bool
 
 # ──────────────────────────────────────────────────────────────
 # Test 2: No namespace matches label -- should fail

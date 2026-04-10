@@ -39,54 +39,53 @@
   gather_facts: false
 
   tasks:
-    - name: Create test Tenant
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: osac.openshift.io/v1alpha1
-          kind: Tenant
-          metadata:
-            name: ciwn-test-tenant
+    - name: Run tenant-found test
+      when: test_tenant_found | default(false) | bool
+      block:
+        - name: Create test Tenant
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: osac.openshift.io/v1alpha1
+              kind: Tenant
+              metadata:
+                name: ciwn-test-tenant
+                namespace: default
+
+        - name: Patch Tenant status via status subresource
+          ansible.builtin.command:
+            cmd: >-
+              kubectl patch tenant ciwn-test-tenant -n default
+              --type=merge --subresource=status
+              -p '{"status":{"namespace":"ciwn-test-vm-work","phase":"Ready"}}'
+          changed_when: true
+
+        - name: Run compute_instance_working_namespace role
+          ansible.builtin.include_role:
+            name: osac.service.compute_instance_working_namespace
+          vars:
+            compute_instance:
+              status:
+                tenantReference:
+                  name: ciwn-test-tenant
+                  namespace: default
+
+        - name: Verify namespace resolved from tenant
+          ansible.builtin.assert:
+            that:
+              - compute_instance_working_namespace is defined
+              - compute_instance_working_namespace == "ciwn-test-vm-work"
+            fail_msg: "Expected 'ciwn-test-vm-work', got '{{ compute_instance_working_namespace | default('undefined') }}'"
+            success_msg: "Working namespace resolved: {{ compute_instance_working_namespace }}"
+
+      always:
+        - name: Cleanup -- delete test Tenant
+          kubernetes.core.k8s:
+            state: absent
+            api_version: osac.openshift.io/v1alpha1
+            kind: Tenant
             namespace: default
-      when: test_tenant_found | default(false) | bool
-
-    - name: Patch Tenant status via status subresource
-      ansible.builtin.command:
-        cmd: >-
-          kubectl patch tenant ciwn-test-tenant -n default
-          --type=merge --subresource=status
-          -p '{"status":{"namespace":"ciwn-test-vm-work","phase":"Ready"}}'
-      changed_when: true
-      when: test_tenant_found | default(false) | bool
-
-    - name: Run compute_instance_working_namespace role
-      ansible.builtin.include_role:
-        name: osac.service.compute_instance_working_namespace
-      vars:
-        compute_instance:
-          status:
-            tenantReference:
-              name: ciwn-test-tenant
-              namespace: default
-      when: test_tenant_found | default(false) | bool
-
-    - name: Verify namespace resolved from tenant
-      ansible.builtin.assert:
-        that:
-          - compute_instance_working_namespace is defined
-          - compute_instance_working_namespace == "ciwn-test-vm-work"
-        fail_msg: "Expected 'ciwn-test-vm-work', got '{{ compute_instance_working_namespace | default('undefined') }}'"
-        success_msg: "Working namespace resolved: {{ compute_instance_working_namespace }}"
-      when: test_tenant_found | default(false) | bool
-
-    - name: Cleanup -- delete test Tenant
-      kubernetes.core.k8s:
-        state: absent
-        api_version: osac.openshift.io/v1alpha1
-        kind: Tenant
-        namespace: default
-        name: ciwn-test-tenant
-      when: test_tenant_found | default(false) | bool
+            name: ciwn-test-tenant
 
 # ──────────────────────────────────────────────────────────────
 # Test 2: Tenant not found -- should fail
