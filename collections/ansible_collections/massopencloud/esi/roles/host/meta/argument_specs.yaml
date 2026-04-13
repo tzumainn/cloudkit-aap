@@ -17,7 +17,7 @@ argument_specs:
         required: true
   list_hosts:
     options:
-      host_class:
-        description: Host class to filter hosts by
+      host_type:
+        description: Host type to filter hosts by
         type: "str"
         required: false

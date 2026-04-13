@@ -7,9 +7,9 @@
     node_list: "{{ baremetal_node_info_result.baremetal_nodes | selectattr('extra.purpose', 'defined') | selectattr('extra.purpose', 'equalto', 'host') | list }}"
 
 - name: Filter by resource class
-  when: host_class is defined
+  when: host_type is defined
   ansible.builtin.set_fact:
-    node_list: "{{ node_list | selectattr('resource_class', 'equalto', host_class) | list }}"
+    node_list: "{{ node_list | selectattr('resource_class', 'equalto', host_type) | list }}"
 
 - name: Filter by available hosts
   ansible.builtin.set_fact:
