@@ -11,7 +11,7 @@ VirtualNetworks define the top-level network isolation boundary with CIDR alloca
 **Key behaviors:**
 - Creates ClusterUserDefinedNetwork CR in the cluster
 - Supports IPv4-only, IPv6-only, and dual-stack configurations
-- NetworkClass determines the implementation strategy (cudn-net)
+- NetworkClass determines the implementation strategy (cudn_net)
 - One VirtualNetwork maps to one ClusterUserDefinedNetwork
 
 **Implementation:**
@@ -74,7 +74,7 @@ Each SecurityGroup creates its own NetworkPolicy, and Kubernetes applies them ad
 
 ## Implementation Strategy
 
-This role implements the `cudn-net` NetworkClass strategy using OpenShift's ClusterUserDefinedNetwork (CUDN) feature. The implementation follows these patterns:
+This role implements the `cudn_net` NetworkClass strategy using OpenShift's ClusterUserDefinedNetwork (CUDN) feature. The implementation follows these patterns:
 
 **For VirtualNetworks:**
 - Create ClusterUserDefinedNetwork CR with Layer2 topology
