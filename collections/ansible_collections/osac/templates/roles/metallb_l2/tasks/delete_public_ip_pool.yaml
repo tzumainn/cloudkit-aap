@@ -29,6 +29,11 @@
     wait: true
     wait_timeout: 300
   register: l2adv_delete_result
+  retries: 3
+  delay: 10
+  until: >-
+    l2adv_delete_result is successful
+    or ('NotFound' in (l2adv_delete_result.msg | default('')))
   failed_when:
     - l2adv_delete_result.failed | default(false)
     - "'NotFound' not in (l2adv_delete_result.msg | default(''))"
@@ -50,6 +55,11 @@
     wait: true
     wait_timeout: 300
   register: ipaddresspool_delete_result
+  retries: 3
+  delay: 10
+  until: >-
+    ipaddresspool_delete_result is successful
+    or ('NotFound' in (ipaddresspool_delete_result.msg | default('')))
   failed_when:
     - ipaddresspool_delete_result.failed | default(false)
     - "'NotFound' not in (ipaddresspool_delete_result.msg | default(''))"

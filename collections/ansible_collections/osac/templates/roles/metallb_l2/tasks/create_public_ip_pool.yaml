@@ -67,6 +67,11 @@
           - "{{ pool_name }}"
   register: l2advertisement_result
 
+  # MetalLB webhook may not be ready yet after operator install
+  retries: 60
+  delay: 10
+  until: l2advertisement_result is successful
+
 - name: Display L2Advertisement creation result
   ansible.builtin.debug:
     msg:
