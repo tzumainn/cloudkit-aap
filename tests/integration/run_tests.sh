@@ -29,6 +29,8 @@ WORKFLOWS=(
   "cluster_post_install"
   "compute_instance_create"
   "compute_instance_with_gpu_create"
+  "compute_instance_create_defaults"
+  "compute_instance_create_validation"
   "compute_instance_delete"
   "cluster_status_reporting"
 )

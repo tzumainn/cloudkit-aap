@@ -85,6 +85,7 @@ kubectl create namespace computeinstance-test-vm-work || true
 
 # 5. Apply test fixtures
 echo "Applying test fixtures..."
-kubectl apply -f "${SCRIPT_DIR}/fixtures/"
+kubectl apply -f "${SCRIPT_DIR}/fixtures/clusterorder-test.yaml"
+kubectl apply -f "${SCRIPT_DIR}/fixtures/computeinstance-test.yaml"
 
 echo "=== Test environment ready ==="

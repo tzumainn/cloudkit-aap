@@ -52,11 +52,6 @@ class AnsibleArgumentSpecEntry(TypedDict):
     options: dict[str, "AnsibleArgumentSpecEntry"]  # Recursive definition
 
 
-# Type hint for reading argument_specs.yaml files
-class AnsibleArgumentSpec(TypedDict):
-    argument_specs: dict[str, AnsibleArgumentSpecEntry]
-
-
 # Type hint for the output of `ansible-galaxy collection list`
 AnsibleCollectionList = dict[str, dict[str, dict[str, str]]]
 
@@ -88,6 +83,7 @@ TypeMapping: dict[AnsibleArgumentType | type, ProtobufType] = {
     float: ProtobufType.FLOAT,
     "path": ProtobufType.STRING,
     "json": ProtobufType.STRING,
+    "string": ProtobufType.STRING,
     "bytes": ProtobufType.BYTEARRAY,
 }
 
@@ -121,7 +117,6 @@ class TemplateParameter(Base):
     required: bool = False
     type: ProtobufType = ProtobufType.STRING
     default: ProtobufAnyValue | None = None
-    choices: list[Any] | None = None
 
     @classmethod
     def from_argspec(cls, name: str, spec: AnsibleArgumentSpecEntry) -> Self:
@@ -133,6 +128,18 @@ class TemplateParameter(Base):
             required=spec.get("required", False),
             default=spec.get("default"),
             type=TypeMapping[spec.get("type", "str")],
+        )
+
+    @classmethod
+    def from_definition(cls, defn: "TemplateParameterDefinition") -> Self:
+        """Create a TemplateParameter from a TemplateParameterDefinition (osac.yaml)."""
+        return cls(
+            name=defn.name,
+            title=defn.title,
+            description=defn.description,
+            required=defn.required,
+            default=defn.default,
+            type=TypeMapping.get(defn.type, ProtobufType.STRING),
         )
 
     @pydantic.field_validator("default", mode="before")
@@ -180,6 +187,74 @@ class NodeSet(Base):
     size: int
 
 
+class ComputeInstanceImage(Base):
+    """Image configuration for compute instance spec defaults."""
+
+    source_type: str = pydantic.Field(
+        ...,
+        validation_alias=pydantic.AliasChoices("sourceType", "source_type"),
+        serialization_alias="source_type",
+    )
+    source_ref: str = pydantic.Field(
+        ...,
+        validation_alias=pydantic.AliasChoices("sourceRef", "source_ref"),
+        serialization_alias="source_ref",
+    )
+
+
+class ComputeInstanceDisk(Base):
+    """Disk configuration for compute instance spec defaults."""
+
+    size_gib: int = pydantic.Field(
+        ...,
+        validation_alias=pydantic.AliasChoices("sizeGiB", "sizeGib", "size_gib"),
+        serialization_alias="size_gib",
+    )
+
+
+class ComputeInstanceTemplateSpecDefaults(Base):
+    """Default values for compute instance spec fields.
+
+    Maps from Ansible camelCase (defaults/main.yaml) to proto snake_case.
+    """
+
+    cores: int | None = None
+    memory_gib: int | None = pydantic.Field(
+        default=None,
+        validation_alias=pydantic.AliasChoices("memoryGiB", "memoryGib", "memory_gib"),
+        serialization_alias="memory_gib",
+    )
+    image: ComputeInstanceImage | None = None
+    boot_disk: ComputeInstanceDisk | None = pydantic.Field(
+        default=None,
+        validation_alias=pydantic.AliasChoices("bootDisk", "boot_disk"),
+        serialization_alias="boot_disk",
+    )
+    run_strategy: str | None = pydantic.Field(
+        default=None,
+        validation_alias=pydantic.AliasChoices("runStrategy", "run_strategy"),
+        serialization_alias="run_strategy",
+    )
+
+
+class ParameterValidation(Base):
+    """Validation rules for a template parameter."""
+
+    pattern: str | None = None
+
+
+class TemplateParameterDefinition(Base):
+    """A parameter definition as written in osac.yaml."""
+
+    name: str
+    title: str | None = None
+    description: str | None = None
+    type: str = "string"
+    required: bool = False
+    default: Any = None
+    validation: ParameterValidation | None = None
+
+
 class TemplateTypeEnum(StrEnum):
     cluster = "cluster"
     compute_instance = "compute_instance"
@@ -207,6 +282,14 @@ class Metadata(Base):
     # Network-specific fields
     implementation_strategy: str | None = None
     capabilities: NetworkClassCapabilities | None = None
+    parameters: list[TemplateParameterDefinition] = pydantic.Field(default_factory=list)
+
+    # spec_defaults is used to set optional default values for the related spec fields associated
+    # with the template type.
+    #
+    # For now, spec_defaults is only used for ComputeInstance templates.
+    # This can be extended/generalized in the future with union type support for other template types.
+    spec_defaults: ComputeInstanceTemplateSpecDefaults | None = None
 
 
 class BaseTemplate(Base):
@@ -255,6 +338,7 @@ class ComputeInstanceTemplate(BaseTemplate):
     template_type: Literal[TemplateTypeEnum.compute_instance] = pydantic.Field(
         default=TemplateTypeEnum.compute_instance, exclude=True
     )
+    spec_defaults: ComputeInstanceTemplateSpecDefaults | None = None
 
 
 class NetworkClassTemplate(Base):
@@ -303,69 +387,59 @@ class Collection(Base):
     parent_path: Path
     name: str
 
-    def read_metadata_for_role(self, path: Path) -> Metadata | None:
-        """Read metadata for a role from osac.yaml/yml file.
+    def _read_yaml(self, path: Path, subdir: str, name: str) -> dict[str, Any] | None:
+        """Find and load a YAML file from a role subdirectory.
+
+        Tries .yaml then .yml extensions, returning the parsed contents of
+        the first file found, or None if no file exists or parsing fails.
 
         Args:
             path: Path to the role directory
+            subdir: Subdirectory within the role (e.g. "meta", "defaults")
+            name: Filename without extension (e.g. "main", "osac")
 
         Returns:
-            Metadata object if found and valid, None otherwise
+            Parsed YAML dict if found and valid, None otherwise
         """
-        for filename in ["osac.yaml", "osac.yml"]:
-            metadata_file: Path = path / "meta" / filename
-            if metadata_file.exists():
+        for ext in (".yaml", ".yml"):
+            filepath = path / subdir / f"{name}{ext}"
+            if filepath.exists():
                 break
         else:
+            return None
+
+        try:
+            with filepath.open("r", encoding="utf-8") as fd:
+                data = yaml.safe_load(fd)
+        except yaml.YAMLError as e:
+            display.warning(f"Failed to parse {filepath}: {e}")
+            return None
+        except (PermissionError, OSError) as e:
+            display.warning(f"Error reading {filepath}: {e}")
+            return None
+
+        if data and isinstance(data, dict):
+            return data
+
+        return None
+
+    def read_metadata_for_role(self, path: Path) -> Metadata | None:
+        """Read metadata for a role from osac.yaml/yml file."""
+        data = self._read_yaml(path, "meta", "osac")
+        if data is None:
             display.vvv(f"No metadata file found for role at {path}")
             return None
 
         try:
-            with metadata_file.open("r", encoding="utf-8") as fd:
-                metadata = yaml.safe_load(fd)
-        except yaml.YAMLError as e:
-            display.warning(f"Failed to parse metadata file {metadata_file}: {e}")
+            return Metadata.model_validate(data)
+        except Exception as e:
+            display.warning(f"Invalid metadata for role at {path}: {e}")
             return None
-        except (PermissionError, OSError) as e:
-            display.warning(f"Error reading metadata file {metadata_file}: {e}")
-            return None
-
-        if metadata:
-            try:
-                return Metadata.model_validate(metadata)
-            except Exception as e:
-                display.warning(f"Invalid metadata in {metadata_file}: {e}")
-                return None
-
-        return None
 
     def read_params_for_role(self, path: Path) -> list[TemplateParameter]:
-        """Read template parameters for a role from argument_specs.yaml/yml file.
-
-        Args:
-            path: Path to the role directory
-
-        Returns:
-            List of TemplateParameter objects, empty list if none found or on error.
-            An empty list is valid - it means the role has no exposed parameters.
-        """
-        for filename in ["argument_specs.yaml", "argument_specs.yml"]:
-            argspec_file = path / "meta" / filename
-            if argspec_file.exists():
-                break
-        else:
-            # No argument_specs file is valid - role may have no parameters
-            return []
-
-        try:
-            with argspec_file.open("r", encoding="utf-8") as fd:
-                argspec: AnsibleArgumentSpec = cast(
-                    AnsibleArgumentSpec, yaml.safe_load(fd))
-        except yaml.YAMLError as e:
-            display.warning(f"Failed to parse argument_specs file {argspec_file}: {e}")
-            return []
-        except (PermissionError, OSError) as e:
-            display.warning(f"Error reading argument_specs file {argspec_file}: {e}")
+        """Read template parameters for a role from argument_specs.yaml/yml file."""
+        data = self._read_yaml(path, "meta", "argument_specs")
+        if data is None:
             return []
 
         template_params: list[TemplateParameter] = []
@@ -373,7 +447,7 @@ class Collection(Base):
         # Navigate the nested structure to find template_parameters
         # Missing keys at any level are valid - just means no parameters defined
         for name, spec in (
-            argspec.get("argument_specs", {})
+            data.get("argument_specs", {})
             .get("main", {})
             .get("options", {})
             .get("template_parameters", {})
@@ -384,9 +458,8 @@ class Collection(Base):
                 template_params.append(TemplateParameter.from_argspec(name, spec))
             except Exception as e:
                 display.warning(
-                    f"Failed to parse template parameter '{name}' in {argspec_file}: {e}"
+                    f"Failed to parse template parameter '{name}' in {path}: {e}"
                 )
-                # Continue processing other parameters
                 continue
 
         return template_params
@@ -415,9 +488,16 @@ class Collection(Base):
                 continue
 
             metadata = self.read_metadata_for_role(path)
-            params = self.read_params_for_role(path)
             if metadata is not None:
                 try:
+                    if metadata.parameters:
+                        params = [
+                            TemplateParameter.from_definition(d)
+                            for d in metadata.parameters
+                        ]
+                    else:
+                        params = self.read_params_for_role(path)
+
                     common = {
                         "collection": self.name,
                         "path": path,
@@ -450,7 +530,7 @@ class Collection(Base):
                             capabilities=metadata.capabilities or NetworkClassCapabilities(),
                         )
                     else:
-                        yield ComputeInstanceTemplate(**common)
+                        yield ComputeInstanceTemplate(**common, spec_defaults=metadata.spec_defaults)
                 except Exception as e:
                     display.warning(
                         f"Failed to create template for role '{path.name}' in collection '{self.name}': {e}"

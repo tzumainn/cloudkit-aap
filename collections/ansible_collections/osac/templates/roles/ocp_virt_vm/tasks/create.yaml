@@ -2,7 +2,7 @@
 # Override points: secrets, modify_vm_spec, pre_create_hook, resources, post_create_hook, wait_annotate
 # NOT overrideable: validate, build_spec (CRITICAL steps for correct operation)
 # Variables: compute_instance, compute_instance_name, tenant_target_namespace,
-# template_id, template_parameters, default_arg_specs, default_vm_labels, default_spec.
+# template_id, template_parameters, default_vm_labels.
 ---
 - name: Include get remote cluster kubeconfig
   ansible.builtin.include_role:
