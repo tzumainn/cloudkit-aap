@@ -231,7 +231,7 @@ capabilities:
              spec:
                ipv4Cidr: "10.0.1.0/24"
    EOF
-   
+
    ansible-playbook test_my_impl.yml
    ```
 
