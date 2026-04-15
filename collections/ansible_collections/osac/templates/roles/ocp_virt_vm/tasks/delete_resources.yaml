@@ -5,7 +5,7 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
   register: vm_info
 
 - name: Check if VM instance exists
@@ -14,7 +14,7 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachineInstance
     name: "{{ compute_instance_name }}"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
   register: vm_exists
 
 - name: Stop VirtualMachine
@@ -23,7 +23,7 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     state: present
     definition:
       spec:
@@ -36,7 +36,7 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     wait: true
     wait_condition:
       type: Ready
@@ -50,7 +50,7 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     state: absent
     wait: true
     wait_timeout: 300
@@ -61,7 +61,7 @@
     api_version: v1
     kind: Service
     name: "{{ compute_instance_name }}-service"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     state: absent
 
 - name: Delete VM load balancer service
@@ -70,7 +70,7 @@
     api_version: v1
     kind: Service
     name: "{{ compute_instance_name }}-load-balancer"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     state: absent
 
 - name: Delete root disk DataVolume
@@ -79,7 +79,7 @@
     api_version: cdi.kubevirt.io/v1beta1
     kind: DataVolume
     name: "{{ compute_instance_name }}-root-disk"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     state: absent
     wait: true
     wait_timeout: 300
@@ -90,7 +90,7 @@
     api_version: cdi.kubevirt.io/v1beta1
     kind: DataVolume
     name: "{{ compute_instance_name }}-disk-{{ idx + 1 }}"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     state: absent
     wait: true
     wait_timeout: 300
@@ -105,7 +105,7 @@
     api_version: v1
     kind: Secret
     name: "{{ compute_instance_name }}-user-data"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     state: absent
   register: delete_user_data_secret
   failed_when:
@@ -119,7 +119,7 @@
     api_version: v1
     kind: Secret
     name: "{{ compute_instance_name }}-cloud-init"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     state: absent
   register: delete_cloud_init_secret
   failed_when:
@@ -133,7 +133,7 @@
     api_version: v1
     kind: Secret
     name: "{{ compute_instance_name }}-ssh-public-key"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     state: absent
   register: delete_ssh_secret
   failed_when:
@@ -145,5 +145,5 @@
   ansible.builtin.debug:
     msg:
       - "Virtual Machine '{{ compute_instance_name }}' deletion completed"
-      - "Namespace: {{ vm_target_namespace }}"
+      - "Namespace: {{ compute_instance_target_namespace }}"
       - "All associated resources have been removed"

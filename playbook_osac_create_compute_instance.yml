@@ -15,10 +15,10 @@
         var: ansible_eda.event.payload
 
     # Brings in variables:
-    # compute_instance_working_namespace
-    - name: Determine working namespace
+    # tenant_target_namespace
+    - name: Determine tenant target namespace
       ansible.builtin.include_role:
-        name: osac.service.compute_instance_working_namespace
+        name: osac.service.tenant_target_namespace
 
     # Discover tenant StorageClass from Tenant status; sets tenant_storage_class_name
     - name: Fail if tenant reference is missing
@@ -38,7 +38,7 @@
         name: osac.service.tenant_storage_class
       vars:
         tenant_storage_class_tenant_name: "{{ compute_instance.status.tenantReference.name }}"
-        tenant_storage_class_tenant_namespace: "{{ compute_instance.status.tenantReference.namespace }}"
+        tenant_namespace: "{{ compute_instance.status.tenantReference.namespace }}"
 
   tasks:
 
@@ -46,7 +46,7 @@
       ansible.builtin.debug:
         msg:
           - "Compute instance name: {{ compute_instance_name }}"
-          - "Compute instance working namespace: {{ compute_instance_working_namespace }}"
+          - "Tenant target namespace: {{ tenant_target_namespace }}"
           - "Template ID: {{ template_id }}"
           - "Template parameters: {{ template_parameters }}"
 

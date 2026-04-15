@@ -10,12 +10,12 @@
     api_version: osac.openshift.io/v1alpha1
     kind: Tenant
     name: "{{ tenant_storage_class_tenant_name }}"
-    namespace: "{{ tenant_storage_class_tenant_namespace }}"
+    namespace: "{{ tenant_namespace }}"
   register: tenant_storage_class_tenant_result
 
 - name: Fail if tenant not found
   ansible.builtin.fail:
-    msg: "Tenant '{{ tenant_storage_class_tenant_name }}' not found in namespace '{{ tenant_storage_class_tenant_namespace }}'."
+    msg: "Tenant '{{ tenant_storage_class_tenant_name }}' not found in namespace '{{ tenant_namespace }}'."
   when: tenant_storage_class_tenant_result.resources | length != 1
 
 - name: Fail if tenant not ready

@@ -1,7 +1,7 @@
 # Create flow: each step is overridable via create_step_*_override (default: create_step_*_default).
 # Override points: secrets, modify_vm_spec, pre_create_hook, resources, post_create_hook, wait_annotate
 # NOT overrideable: validate, build_spec (CRITICAL steps for correct operation)
-# Variables: compute_instance, compute_instance_name, compute_instance_working_namespace,
+# Variables: compute_instance, compute_instance_name, tenant_target_namespace,
 # template_id, template_parameters, default_arg_specs, default_vm_labels, default_spec.
 ---
 - name: Include get remote cluster kubeconfig
@@ -11,11 +11,11 @@
 
 - name: Determine target namespace for VM resources
   ansible.builtin.set_fact:
-    vm_target_namespace: "{{ compute_instance.metadata.annotations['osac.openshift.io/subnet-namespace'] | default(compute_instance_working_namespace) }}"
+    compute_instance_target_namespace: "{{ compute_instance.metadata.annotations['osac.openshift.io/subnet-target-namespace'] | default(tenant_target_namespace) }}"
 
 - name: Log namespace selection
   ansible.builtin.debug:
-    msg: "VM will be created in namespace: {{ vm_target_namespace }} (tenant namespace: {{ compute_instance_working_namespace }})"
+    msg: "VM will be created in namespace: {{ compute_instance_target_namespace }} (tenant namespace: {{ tenant_target_namespace }})"
 
 - name: Set create step defaults
   ansible.builtin.set_fact:
