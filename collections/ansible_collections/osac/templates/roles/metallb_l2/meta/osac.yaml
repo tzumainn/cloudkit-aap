@@ -1,0 +1,14 @@
+---
+title: MetalLB L2 Implementation
+description: >
+  Provisions MetalLB IPAddressPool and L2Advertisement resources for PublicIPPool.
+  Handles L2-based IP address advertisement on bare-metal clusters.
+
+template_type: network
+
+# PublicIPPool registration fields
+implementation_strategy: metallb-l2
+capabilities:
+  supports_ipv4: true
+  supports_ipv6: true
+  supports_dual_stack: false

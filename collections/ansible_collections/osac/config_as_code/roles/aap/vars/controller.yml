@@ -171,6 +171,30 @@ controller_templates: # noqa: var-naming[no-role-prefix]
     allow_simultaneous: true
     ask_variables_on_launch: true
     verbosity: 0
+  - name: "{{ aap_prefix }}-create-public-ip-pool"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_create_public_ip_pool.yml"
+    inventory: "{{ aap_prefix }}-networking-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-networking-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
+  - name: "{{ aap_prefix }}-delete-public-ip-pool"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_delete_public_ip_pool.yml"
+    inventory: "{{ aap_prefix }}-networking-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-networking-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
 
 controller_job_template_surveys: # noqa: var-naming[no-role-prefix]
   - name: "{{ aap_prefix }}-create-hosted-cluster-post-install"
