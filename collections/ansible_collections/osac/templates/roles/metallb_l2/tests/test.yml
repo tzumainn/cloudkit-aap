@@ -1,0 +1,185 @@
+---
+# Test playbook for osac.templates.metallb_l2 role.
+#
+# Tests create and delete of MetalLB IPAddressPool and L2Advertisement
+# resources. Requires a cluster with MetalLB CRDs applied and the
+# metallb-system namespace present. No MetalLB operator is needed since
+# tests only verify CR creation and deletion, not controller behavior.
+#
+# Do NOT set OSAC_REMOTE_CLUSTER_KUBECONFIG when running these tests.
+# The role's get_remote_cluster_kubeconfig include is a no-op without it,
+# and kubernetes.core.k8s falls back to the default kubeconfig.
+#
+# Usage:
+#   # Run all tests in sequence (create, verify, delete, delete-not-found)
+#   ansible-playbook test.yml -v
+#
+#   # Run only create tests
+#   ansible-playbook test.yml -e run_create=true -v
+#
+#   # Run only delete tests (resources must already exist)
+#   ansible-playbook test.yml -e run_delete=true -v
+#
+#   # Run only delete-not-found test (resources must NOT exist)
+#   ansible-playbook test.yml -e run_delete_not_found=true -v
+
+# ──────────────────────────────────────────────────────────────
+# Test: Create IPAddressPool and L2Advertisement
+# Expected: Both resources created in metallb-system with correct
+#   spec, labels, and naming conventions.
+# ──────────────────────────────────────────────────────────────
+- name: Test metallb_l2 role -- create PublicIPPool resources
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    test_pool_name: "test-metallb-pool"
+    test_pool_cidrs:
+      - "192.168.100.0/28"
+      - "192.168.101.0/28"
+    public_ip_pool_name: "{{ test_pool_name }}"
+    public_ip_pool:
+      metadata:
+        name: "{{ test_pool_name }}"
+      spec:
+        cidrs: "{{ test_pool_cidrs }}"
+
+  tasks:
+    - name: Run create tests
+      when: run_create | default(true) | bool
+      block:
+        - name: Create MetalLB resources via metallb_l2 role
+          ansible.builtin.include_role:
+            name: osac.templates.metallb_l2
+            tasks_from: create_public_ip_pool
+
+        - name: Fetch IPAddressPool
+          kubernetes.core.k8s_info:
+            api_version: metallb.io/v1beta1
+            kind: IPAddressPool
+            name: "{{ test_pool_name }}"
+            namespace: metallb-system
+          register: ipaddresspool_result
+
+        - name: Verify IPAddressPool exists with correct spec
+          ansible.builtin.assert:
+            that:
+              - ipaddresspool_result.resources | length == 1
+              - ipaddresspool_result.resources[0].spec.autoAssign == false
+              - ipaddresspool_result.resources[0].spec.addresses == test_pool_cidrs
+            fail_msg: "IPAddressPool not created correctly"
+            success_msg: "IPAddressPool '{{ test_pool_name }}' created with correct spec"
+
+        - name: Verify IPAddressPool labels
+          ansible.builtin.assert:
+            that:
+              - ipaddresspool_result.resources[0].metadata.labels['osac.openshift.io/publicippool'] == test_pool_name
+              - ipaddresspool_result.resources[0].metadata.labels['osac.io/managed-by'] == 'osac-fulfillment'
+            fail_msg: "IPAddressPool labels incorrect"
+            success_msg: "IPAddressPool labels correct"
+
+        - name: Fetch L2Advertisement
+          kubernetes.core.k8s_info:
+            api_version: metallb.io/v1beta1
+            kind: L2Advertisement
+            name: "{{ test_pool_name }}-l2adv"
+            namespace: metallb-system
+          register: l2advertisement_result
+
+        - name: Verify L2Advertisement exists and references IPAddressPool
+          ansible.builtin.assert:
+            that:
+              - l2advertisement_result.resources | length == 1
+              - test_pool_name in l2advertisement_result.resources[0].spec.ipAddressPools
+            fail_msg: "L2Advertisement not created correctly"
+            success_msg: "L2Advertisement '{{ test_pool_name }}-l2adv' created referencing correct pool"
+
+        - name: Verify L2Advertisement labels
+          ansible.builtin.assert:
+            that:
+              - l2advertisement_result.resources[0].metadata.labels['osac.openshift.io/publicippool'] == test_pool_name
+              - l2advertisement_result.resources[0].metadata.labels['osac.io/managed-by'] == 'osac-fulfillment'
+            fail_msg: "L2Advertisement labels incorrect"
+            success_msg: "L2Advertisement labels correct"
+
+# ──────────────────────────────────────────────────────────────
+# Test: Delete IPAddressPool and L2Advertisement
+# Expected: Both resources deleted. L2Advertisement deleted first.
+# ──────────────────────────────────────────────────────────────
+- name: Test metallb_l2 role -- delete PublicIPPool resources
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    test_pool_name: "test-metallb-pool"
+    public_ip_pool_name: "{{ test_pool_name }}"
+    public_ip_pool:
+      metadata:
+        name: "{{ test_pool_name }}"
+
+  tasks:
+    - name: Run delete tests
+      when: run_delete | default(true) | bool
+      block:
+        - name: Delete MetalLB resources via metallb_l2 role
+          ansible.builtin.include_role:
+            name: osac.templates.metallb_l2
+            tasks_from: delete_public_ip_pool
+
+        - name: Verify IPAddressPool is gone
+          kubernetes.core.k8s_info:
+            api_version: metallb.io/v1beta1
+            kind: IPAddressPool
+            name: "{{ test_pool_name }}"
+            namespace: metallb-system
+          register: ipaddresspool_after_delete
+
+        - name: Assert IPAddressPool deleted
+          ansible.builtin.assert:
+            that:
+              - ipaddresspool_after_delete.resources | length == 0
+            fail_msg: "IPAddressPool still exists after delete"
+            success_msg: "IPAddressPool '{{ test_pool_name }}' successfully deleted"
+
+        - name: Verify L2Advertisement is gone
+          kubernetes.core.k8s_info:
+            api_version: metallb.io/v1beta1
+            kind: L2Advertisement
+            name: "{{ test_pool_name }}-l2adv"
+            namespace: metallb-system
+          register: l2adv_after_delete
+
+        - name: Assert L2Advertisement deleted
+          ansible.builtin.assert:
+            that:
+              - l2adv_after_delete.resources | length == 0
+            fail_msg: "L2Advertisement still exists after delete"
+            success_msg: "L2Advertisement '{{ test_pool_name }}-l2adv' successfully deleted"
+
+# ──────────────────────────────────────────────────────────────
+# Test: Delete when resources already gone (NotFound handling)
+# Expected: No failure. The role tolerates already-deleted resources.
+# ──────────────────────────────────────────────────────────────
+- name: Test metallb_l2 role -- delete tolerates NotFound
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    test_pool_name: "test-metallb-pool"
+    public_ip_pool_name: "{{ test_pool_name }}"
+    public_ip_pool:
+      metadata:
+        name: "{{ test_pool_name }}"
+
+  tasks:
+    - name: Run delete-not-found test
+      when: run_delete_not_found | default(true) | bool
+      block:
+        - name: Delete already-gone resources (should not fail)
+          ansible.builtin.include_role:
+            name: osac.templates.metallb_l2
+            tasks_from: delete_public_ip_pool
+
+        - name: Confirm no failure occurred
+          ansible.builtin.debug:
+            msg: "Delete-not-found test passed: role tolerated already-deleted resources"
