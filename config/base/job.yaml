@@ -32,7 +32,14 @@ spec:
               CONTROLLER_GATEWAY=$?
               echo "CONTROLLER_GATEWAY exit code: $CONTROLLER_GATEWAY"
 
-              if [ $GATEWAY -eq 0 ] && [ $EDA_GATEWAY -eq 0 ] && [ $CONTROLLER_GATEWAY -eq 0 ];
+              auth_code=$(curl -sk -o /dev/null -w "%{http_code}" -X POST \
+                http://${AAP_GATEWAY_HOSTNAME}/api/gateway/v1/tokens/ \
+                -d "username=admin&password=dummy" 2>/dev/null)
+              [ "$auth_code" != "503" ] && [ "$auth_code" != "000" ];
+              AUTH_UPSTREAM=$?
+              echo "AUTH_UPSTREAM exit code: $AUTH_UPSTREAM (HTTP $auth_code)"
+
+              if [ $GATEWAY -eq 0 ] && [ $EDA_GATEWAY -eq 0 ] && [ $CONTROLLER_GATEWAY -eq 0 ] && [ $AUTH_UPSTREAM -eq 0 ];
               then
                 echo "AAP controller is ready!"
                 exit 0
