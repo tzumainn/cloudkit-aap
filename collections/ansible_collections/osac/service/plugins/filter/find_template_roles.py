@@ -176,7 +176,7 @@ class NodeRequest(Base):
 class NodeSet(Base):
     """NodeSet represents the template's default bare metal resources"""
 
-    host_class: str
+    host_type: str
     size: int
 
 
@@ -242,7 +242,7 @@ class ClusterTemplate(BaseTemplate):
     def node_sets(self) -> dict[str, NodeSet] | None:
         ret = {
             nr.resource_class: NodeSet(
-                host_class=nr.resource_class, size=nr.number_of_nodes
+                host_type=nr.resource_class, size=nr.number_of_nodes
             )
             for nr in self.default_node_request
         }
