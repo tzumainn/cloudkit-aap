@@ -36,9 +36,12 @@
 
 - name: Determine which resource classes are no longer needed
   ansible.builtin.set_fact:
-    removed_resource_classes: "{{ removed_resource_classes | default([]) + [item.metadata.labels[esi_agent_resource_class_label]] }}"
+    removed_resource_classes: "{{ removed_resource_classes | default([]) + [item.metadata.labels[agent_resource_class_label]] }}"
   with_items: "{{ current_node_pools.resources }}"
-  when: item.metadata.labels[esi_agent_resource_class_label] not in requested_resource_classes
+  when:
+    - item.metadata.labels is defined
+    - agent_resource_class_label in item.metadata.labels
+    - item.metadata.labels[agent_resource_class_label] not in requested_resource_classes
 
 - name: Display additional resource classes to be removed
   ansible.builtin.debug:

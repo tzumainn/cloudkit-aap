@@ -72,8 +72,8 @@
           - service: Ignition
             servicePublishingStrategy:
               type: Route
-        controllerAvailabilityPolicy: HighlyAvailable
-        infrastructureAvailabilityPolicy: HighlyAvailable
+        controllerAvailabilityPolicy: "{{ hosted_cluster_controller_availability_policy }}"
+        infrastructureAvailabilityPolicy: "{{ hosted_cluster_infrastructure_availability_policy }}"
         olmCatalogPlacement: management
 
 - name: Hook - Modify HostedCluster definition
@@ -100,7 +100,7 @@
         'metadata': {
           'name': nodepool_prefix + '-' + item.resourceClass,
           'namespace': hosted_cluster_namespace,
-          'labels': {esi_agent_resource_class_label: item.resourceClass} | combine(hosted_cluster_default_cluster_order_label)
+          'labels': {agent_resource_class_label: item.resourceClass} | combine(hosted_cluster_default_cluster_order_label)
         },
         'spec': {
           'clusterName': hosted_cluster_name,
@@ -113,7 +113,7 @@
             'type': 'Agent',
             'agent': {
               'agentLabelSelector': {
-                'matchLabels': {esi_agent_resource_class_label: item.resourceClass} | combine(hosted_cluster_default_cluster_order_label)
+                'matchLabels': {agent_resource_class_label: item.resourceClass} | combine(hosted_cluster_default_cluster_order_label)
               }
             }
           },
@@ -153,9 +153,12 @@
 
     - name: Determine which resource classes are no longer needed
       ansible.builtin.set_fact:
-        hosted_cluster_removed_resource_classes: "{{ hosted_cluster_removed_resource_classes | default([]) + [item.metadata.labels[esi_agent_resource_class_label]] }}"
+        hosted_cluster_removed_resource_classes: "{{ hosted_cluster_removed_resource_classes | default([]) + [item.metadata.labels[agent_resource_class_label]] }}"
       with_items: "{{ hosted_cluster_nodepools.resources }}"
-      when: item.metadata.labels[esi_agent_resource_class_label] not in hosted_cluster_requested_resource_classes
+      when:
+        - item.metadata.labels is defined
+        - agent_resource_class_label in item.metadata.labels
+        - item.metadata.labels[agent_resource_class_label] not in hosted_cluster_requested_resource_classes
 
     - name: Set nodepools to be removed
       ansible.builtin.set_fact:

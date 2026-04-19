@@ -98,6 +98,13 @@
       spec:
         ipAddressPools:
           - ingress-ipaddresspool
+  register: metallb_ingress_l2advertisement
+
+  # this can fail if the metallb webhook isn't active yet
+  # retry once every 10 seconds for 10 minutes
+  until: metallb_ingress_l2advertisement is successful
+  retries: 60
+  delay: 10
 
 - name: Create metallb ingress service
   kubernetes.core.k8s:

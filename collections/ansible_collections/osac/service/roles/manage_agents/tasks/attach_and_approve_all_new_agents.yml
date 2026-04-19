@@ -24,6 +24,7 @@
   loop: "{{ manage_agents_new }}"
   loop_control:
     label: "Attach agent {{ item.metadata.name }}"
+  when: not (manage_agents_skip_network_attach | default(false))
 
 - name: Approve selected agents
   kubernetes.core.k8s_json_patch:

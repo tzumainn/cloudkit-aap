@@ -1,0 +1,4 @@
+---
+- name: Delete VPC
+  when: vpc_state == 'absent'
+  ansible.builtin.include_tasks: delete.yaml

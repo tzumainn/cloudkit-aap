@@ -1,3 +1,4 @@
+---
 argument_specs:
   main:
     options:
@@ -15,6 +16,13 @@ argument_specs:
       external_access_name:
         type: str
         required: true
-      external_access_api_internal_network:
+      network_steps_collection:
         type: str
+        required: true
+        description: "Ansible collection providing network-class-specific steps (e.g. 'netris.steps', 'massopencloud.steps')"
+      cluster_working_namespace:
+        type: str
+        required: true
+      cluster_order:
+        type: dict
         required: true

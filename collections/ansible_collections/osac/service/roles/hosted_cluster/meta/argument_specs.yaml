@@ -36,3 +36,15 @@ argument_specs:
           ssh_public_key:
             type: str
             required: false
+      hosted_cluster_controller_availability_policy:
+        type: str
+        required: false
+        choices:
+        - HighlyAvailable
+        - SingleReplica
+      hosted_cluster_infrastructure_availability_policy:
+        type: str
+        required: false
+        choices:
+        - HighlyAvailable
+        - SingleReplica
