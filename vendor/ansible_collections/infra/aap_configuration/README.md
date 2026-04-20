@@ -1,11 +1,16 @@
 # Red Hat Communities of Practice AAP Configuration Collection
 
-![pre-commit tests](https://github.com/redhat-cop/aap_configuration/actions/workflows/pre-commit.yml/badge.svg)
-![Release](https://github.com/redhat-cop/aap_configuration/actions/workflows/release.yml/badge.svg)
-<!-- markdownlint-disable-line MD033 MD034 --><a href="https://raw.githubusercontent.com/redhat-cop/infra.controller_configuration/devel/docs/aap_config_as_code_public_meeting.ics"><img border="0" alt="Google Calendar invite" width="60" src="https://ssl.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_20_2x.png"></a>
+[![pre-commit tests](https://github.com/redhat-cop/infra.aap_configuration/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/redhat-cop/infra.aap_configuration/actions/workflows/pre-commit.yml)
+[![Release - Automated](https://github.com/redhat-cop/infra.aap_configuration/actions/workflows/release_auto.yml/badge.svg)](https://github.com/redhat-cop/infra.aap_configuration/actions/workflows/release_auto.yml)
 <!-- Further CI badges go here as above -->
 
+[![Google Calendar invite](https://ssl.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_20_2x.png)](https://raw.githubusercontent.com/redhat-cop/infra.aap_configuration/devel/docs/aap_config_as_code_public_meeting.ics)
+
 This Ansible collection allows for easy interaction with AAP 2.5+ via Ansible roles using the modules from the certified collections.
+
+## Getting Started
+
+**New to this collection?** Check out our [Getting Started Guide](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/docs/GETTING_STARTED.md) for a step-by-step introduction to using the `dispatch` role and configuring your AAP environment.
 
 ## Getting Help
 
@@ -25,6 +30,7 @@ collections:
   - name: ansible.platform
   - name: ansible.hub
   - name: ansible.controller
+    version: ">=4.6.0"
   - name: ansible.eda
   - name: infra.aap_configuration
 ...
@@ -34,7 +40,7 @@ collections:
 
 |                                      Collection Name                                |            Purpose            |
 |:-----------------------------------------------------------------------------------:|:-----------------------------:|
-| ansible.platform repo (no public repo for this collection)                          | gateway/platform modules      |
+| [ansible.platform repo](https://github.com/ansible/ansible.platform)                | gateway/platform modules      |
 | [ansible.hub repo](https://github.com/ansible-collections/ansible_hub)              | Automation hub modules        |
 | [ansible.controller repo](https://github.com/ansible/awx/tree/devel/awx_collection) | Automation controller modules |
 | [ansible.eda repo](https://github.com/ansible/event-driven-ansible)                 | Event Driven Ansible modules  |
@@ -101,47 +107,133 @@ This error usually means the required Ansible collection (e.g., `infra.aap_confi
 
 Verify installation with `ansible-galaxy collection list` and that you have all the stated dependencies listed above in the requirements section.
 
-Define following vars here, or in `aap_configs/controller_auth.yml`
-`aap_hostname: ansible-controller-web-svc-test-project.example.com`
+Define following vars here, or in `aap_configs/auth.yml`
+`aap_hostname: aap.example.com`
 
 You can also specify authentication by a combination of either:
 
 * `aap_hostname`, `aap_username`, `aap_password`
 * `aap_hostname`, `aap_token`
 
-The OAuth2 token is the preferred method. You can obtain the token through the preferred `controller_token` module, or through the
-AWX CLI [login](https://docs.ansible.com/automation-controller/latest/html/controllerapi/authentication.html)
+The OAuth2 token is the preferred method. You can obtain the token through the preferred `aap_token` module, or through the
+AWX CLI [login](https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.6/html/automation_execution_api_overview/controller-api-auth-methods)
 command.
 
-These can be specified via (from highest to lowest precedence):
-
-* direct role variables as mentioned above
-* environment variables (most useful when running against localhost)
-* a config file path specified by the `controller_config_file` parameter
-* a config file at `~/.controller_cli.cfg`
-* a config file at `/etc/controller/controller_cli.cfg`
-
-Config file syntax looks like this:
-
-```ini
-[general]
-host = https://localhost:8043
-verify_ssl = true
-oauth_token = LEdCpKVKc4znzffcpQL5vLG8oyeku6
-```
-
-Controller token module would be invoked with this code:
+AAP token module would be invoked with this code:
 
 ```yaml
-    - name: Create a new token using controller username/password
-      ansible.controller.token:
+    - name: Create a new token using platform username/password
+      ansible.platform.token:
         description: 'Creating token to test controller jobs'
         scope: "write"
         state: present
-        controller_host: "{{ aap_hostname }}"
+        aap_hostname: "{{ aap_hostname }}"
         aap_username: "{{ aap_username }}"
         aap_password: "{{ aap_password }}"
 
+```
+
+### Error Handling
+
+Many of the roles in this collection use asynchronous tasks to perform their
+actions. By default the first failed asynchronous task will cause the playbook to
+fail. Setting the `aap_configuration_collect_logs` variable to `true` will
+enable collecting all asynchronous task failure messages and allow the playbook
+to run to completion.
+
+When `aap_configuration_collect_logs` is enabled the reported errors are
+collected in a variable called `aap_configuration_role_errors`. This variable is
+a dictionary where each key is the type of the configuration item that failed to
+be applied. The value of each key is a list of all the failures of that type.
+
+When the `dispatch` role is used and `aap_configuration_collect_logs` is enabled
+it will display any errors encountered while applying the configurations and
+fail.
+
+Example Output when using the `dispatch` role and encoutering failures:
+
+```yaml
+fatal: [localhost]: FAILED! => {
+    "msg": [
+        "Errors encountered applying configurations:",
+        {
+            "aap_organizations_errors": [
+                {
+                    "ERROR_MESSAGE": "Request to /api/controller/v2/instance_groups/?name=not-real returned 0 items, expected 1",
+                    "name": "Test Organization"
+                },
+                {
+                    "ERROR_MESSAGE": "Request to /api/controller/v2/instance_groups/?name=not-real returned 0 items, expected 1",
+                    "name": "Test Organization 2"
+                }
+            ],
+            "controller_applications_errors": [
+                {
+                    "ERROR_MESSAGE": "Request to /api/controller/v2/organizations/?name=UnknownOrg returned 0 items, expected 1",
+                    "name": "controller_application-failed-app1",
+                    "organization": "UnknownOrg"
+                },
+                {
+                    "ERROR_MESSAGE": "value of authorization_grant_type must be one of: password, authorization-code, got: password2",
+                    "name": "controller_application-failed-app2",
+                    "organization": "Default"
+                }
+            ],
+        }
+    ]
+}
+```
+
+### Registering values
+
+As of version 4.0.0 of this collection, you can now collect information from the items which are created or modified by this collection. You can either add `register: <var>` to any item which is created to capture the outputs of that item, or set a value for `aap_configuration_register` which will capture all objects created. This functionality may be particularly useful for capturing IDs of objects to enable performing further actions.
+
+Below is an example for adding a register to a single item:
+
+```yaml
+controller_templates:
+  - name: myjt1
+    project: Demo Project
+    playbook: install_product_demos.yml
+    inventory: Demo Inventory
+    register: register_var
+```
+
+The resulting variable from setting `aap_configuration_register` will be as follows:
+
+```json
+"aap_register_var": {
+        "job_templates": [
+            {
+                "ansible_job_id": "j994617402834.25953",
+                "attempts": 4,
+                "changed": false,
+                "failed": false,
+                "finished": 1,
+                "id": 11,
+                "results_file": "/Users/tpage/.ansible_async/j994617402834.25953",
+                "started": 1,
+                "stderr": "",
+                "stderr_lines": [],
+                "stdout": "",
+                "stdout_lines": []
+            },
+            {
+                "ansible_job_id": "j666467675004.25976",
+                "attempts": 1,
+                "changed": false,
+                "failed": false,
+                "finished": 1,
+                "id": 12,
+                "results_file": "/Users/tpage/.ansible_async/j666467675004.25976",
+                "started": 1,
+                "stderr": "",
+                "stderr_lines": [],
+                "stdout": "",
+                "stdout_lines": []
+            }
+        ]
+    }
 ```
 
 ### Automate the Automation
@@ -187,7 +279,7 @@ Adding the ability to use direct output from the awx export command in the roles
 We welcome community contributions to this collection. If you find problems, please open an issue or create a PR against the [Controller Configuration collection repository](https://github.com/redhat-cop/aap_configuration).
 More information about contributing can be found in our [Contribution Guidelines.](https://github.com/redhat-cop/aap_configuration/blob/devel/.github/CONTRIBUTING.md)
 
-<!-- markdownlint-disable-line MD033 MD034 -->We have a community meeting every 4 weeks. Find the agenda in the [issues](https://github.com/redhat-cop/infra.controller_configuration/issues) and the calendar invitation here:<a target="_blank" href="https://raw.githubusercontent.com/redhat-cop/infra.controller_configuration/devel/docs/aap_config_as_code_public_meeting.ics"><img border="0" alt="Google Calendar invite" width="20" src="https://ssl.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_20_2x.png"></a>
+We have a community meeting every 4 weeks. Find the agenda in the [issues](https://github.com/redhat-cop/infra.aap_configuration/issues) and the calendar invitation here: [![Google Calendar invite](https://ssl.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_20_2x.png)](https://raw.githubusercontent.com/redhat-cop/infra.aap_configuration/devel/docs/aap_config_as_code_public_meeting.ics)
 
 ## Code of Conduct
 

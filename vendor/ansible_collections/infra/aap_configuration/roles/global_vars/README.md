@@ -18,9 +18,9 @@ dependencies:
 
 This is currently providing the following variables:
 
-| Variable Name | Default Value | Required | Description |
-|:---|:---:|:---:|:---|
-| `operation_translate` | [See the default value below](#operation_translate-default-value) | Yes | Provides translation from object states to human interpretation |
+| Variable Name         | Default Value                                                     | Required | Description                                                     |
+| :---                  | :---:                                                             | :---:    | :---                                                            |
+| `operation_translate` | [See the default value below](#operation_translate-default-value) | Yes      | Provides translation from object states to human interpretation |
 
 ### operation_translate Default value
 
@@ -38,7 +38,7 @@ operation_translate:
 
 ## License
 
-[GPL-3.0](https://github.com/redhat-cop/aap_configuration#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 

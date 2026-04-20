@@ -15,11 +15,13 @@ An Ansible Role to create rulebook activations in EDA Controller.
 |`aap_password`|""|no|Platform Admin User's password on the Server.  This should be stored in an Ansible Vault at vars/platform-secrets.yml or elsewhere and called from a parent playbook.||
 |`aap_token`|""|no|Controller Admin User's token on the Ansible Automation Platform Server. This should be stored in an Ansible Vault at or elsewhere and called from a parent playbook. Either username / password or oauthtoken need to be specified.||
 |`aap_request_timeout`|`10`|no|Specify the timeout in seconds Ansible should use in requests to the controller host.||
+|`aap_configuration_collect_logs`|`false`|no|Specify whether to collect async results and continue for all failed async tasks instead of failing on the first error. Collected results are available in the `aap_configuration_role_errors` variable.||
+|`aap_configuration_register`|""|no|Specify a variable to register the values of all aap_configuration tasks. This will create an object with each aap object as an element containing a list of each item created.||
 |`eda_rulebook_activations`|`see below`|yes|Data structure describing your users Described below.||
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
 The role defaults to false as normally the add group_roles task does not include sensitive information.
 eda_configuration_rulebook_activations_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of automation hub configuration roles with a single variable, or for the user to selectively use it.
@@ -39,9 +41,9 @@ This also speeds up the overall role.
 |Variable Name|Default Value|Required|Description|
 |:---:|:---:|:---:|:---:|
 |`aap_configuration_async_retries`|50|no|This variable sets the number of retries to attempt for the role globally.|
-|`eda_configuration_rulebook_activations_secure_logging`|`aap_configuration_async_retries`|no|This variable sets the number of retries to attempt for the role.|
+|`eda_configuration_rulebook_activations_async_retries`|`aap_configuration_async_retries`|no|This variable sets the number of retries to attempt for the role.|
 |`aap_configuration_async_delay`|1|no|This sets the delay between retries for the role globally.|
-|`eda_configuration_rulebook_activations_async_retries`|`aap_configuration_async_delay`|no|This sets the delay between retries for the role.|
+|`eda_configuration_rulebook_activations_async_delay`|`aap_configuration_async_delay`|no|This sets the delay between retries for the role.|
 |`aap_configuration_loop_delay`|1000|no|This variable sets the loop_delay for the role globally.|
 |`eda_configuration_rulebook_activations_async_delay`|`aap_configuration_loop_delay`|no|This variable sets the loop_delay for the role.|
 |`aap_configuration_async_dir`|`null`|no|Sets the directory to write the results file for async tasks. The default value is set to `null` which uses the Ansible Default of `/root/.ansible_async/`.|
@@ -62,11 +64,12 @@ This also speeds up the overall role.
 |`awx_token`|""|no|str|The token used to authenticate to controller.|
 |`enabled`|"true"|no|str|Whether the rulebook activation is automatically enabled to run.|
 |`state`|`present`|no|str|Desired state of the rulebook activation.|
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
 |`organization`|""|no|str|The name of the organization.|
 |`eda_credentials`|""|no|list|A list of IDs for EDA credentials used by the rulebook activation.|
 |`k8s_service_name`|""|no|str|The name of the Kubernetes service associated with this rulebook activation.|
 |`swap_single_source`|"true"|no|bool|Allow swapping of single sources in a rulebook without name match.|
-|`event_streams`|""|no|list|A list of event stream names that this rulebook activation listens to.|
+|`event_streams`|""|no|list|A list of dicts defining event streams for this rulebook activation. Each dict requires `event_stream` (str, the event stream name) and one of `source_name` (str) or `source_index` (int) to identify the source. `source_name` and `source_index` are mutually exclusive. See the YAML example below.|
 |`log_level`|""|no|str|Allow setting the desired log level.|
 
 ### Standard rulebook activation Data Structure
@@ -81,6 +84,10 @@ eda_rulebook_activations:
     project: EDA_example
     rulebook: git-hook-deploy-rules.yml
     decision_environment: Automation Hub Default Decision Environment
+    event_streams:
+      - event_stream: "Example Event Stream"
+        source_name: "Sample source"
+        source_index: 0
     extra_vars:
       provider: github-local
       repo_url: https://github.com/ansible/ansible-rulebook.git
@@ -116,7 +123,7 @@ eda_rulebook_activations:
 
 ## License
 
-[GPLv3+](https://github.com/redhat-cop/eda_configuration#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 

@@ -2,7 +2,7 @@
  "collection_info": {
   "namespace": "infra",
   "name": "aap_configuration",
-  "version": "3.4.1",
+  "version": "4.4.0",
   "authors": [
    "Andrew Huffman",
    "Adebisi Oyawale @aoyawale",
@@ -39,7 +39,7 @@
   "name": "FILES.json",
   "ftype": "file",
   "chksum_type": "sha256",
-  "chksum_sha256": "1db34029c48301a3fb8d7d392b897fd9c4feb827bc110d4bcdcf7df507963ae8",
+  "chksum_sha256": "343ec9daa9f147b97eba2aa11e171059f9ed3ee3a10fbb0bc10b68cddce93df5",
   "format": 1
  },
  "format": 1

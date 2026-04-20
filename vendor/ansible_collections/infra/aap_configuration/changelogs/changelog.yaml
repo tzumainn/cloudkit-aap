@@ -97,7 +97,7 @@ releases:
         job_launch, job_cancel, project_update, workflow_launch
       - Updated collection to use and comply with ansible-lint v5
       minor_changes:
-      - Fixed default filters to use true when neccessary and changed a few defaults
+      - Fixed default filters to use true when necessary and changed a few defaults
         to omit rather then a value or empty string.
       - updated various Readmes to fix typos and missing information.
     fragments:
@@ -852,3 +852,280 @@ releases:
     fragments:
     - hub_token.yml
     release_date: '2025-06-05'
+  3.5.0:
+    changes:
+      bugfixes:
+      - Corrected README for controller_credentials, API URL reference was pointed
+        to AAP 2.4 API not 2.5
+      minor_changes:
+      - Add object_ids parameter to gateway_role_user_assignments role
+      - Add the ability to collect error logs while configuring the object, instead
+        of failing on the first error.
+      - Fix variable name in dispatch role.
+      - gateway_role_user_assignments - ansible.platform.role_user_assignment as of
+        version 2.5.20250702 supports the objects_ids parameters and marks object_id
+        as deprecated. pull request
+    fragments:
+    - 1140-add-objectids-argspec.yml
+    - controller_objects.yml
+    - objects_ids.yml
+    - update_controller_credentials_readme.yml
+    release_date: '2025-09-01'
+  3.5.1:
+    changes:
+      bugfixes:
+      - Fix accidentally removed usage of '_async_delay' and '_async_retries' variables
+      - Fixes issue when adding workflow schemas where the job_id is not defined because
+        a failure state has occurred
+    fragments:
+    - 1154_retries_delay.yml
+    - workflow_schema_job_id.yml
+    release_date: '2025-09-05'
+  3.5.2:
+    changes:
+      bugfixes:
+      - fixing bug that got introduced in 3.5.1 causing no_log issues
+    fragments:
+    - no_log_fix.yml
+    release_date: '2025-09-09'
+  3.6.0:
+    changes:
+      bugfixes:
+      - changing `workflow_job_templates_secure_logging` to fit standard `controller_configuration_workflow_job_templates_secure_logging`
+      - fixing `workflow_job_templates_async_delay` to what it was supposed to be
+        `controller_configuration_workflow_async_delay`
+      - fixing `workflow_job_templates_async_retries` to what it was supposed to be
+        controller_configuration_workflow_async_retries`
+      minor_changes:
+      - added a sync option to collection_repository_sync role to allow more easily
+        skipping of specific repositories
+    fragments:
+    - collection_repo_sync.yml
+    - workflow_jt_vars.yml
+    release_date: '2025-09-15'
+  3.7.0:
+    changes:
+      bugfixes:
+      - fixing `controller_configuration_workflow_async_delay` to what it was supposed
+        to be `controller_configuration_workflow_job_templates_async_delay`
+      - fixing `controller_configuration_workflow_async_retries` to what it was supposed
+        to be `controller_configuration_workflow_job_templates_async_retries`
+      - fixing `controller_configuration_workflow_loop_delay` to what it was supposed
+        to be `controller_configuration_workflow_job_templates_loop_delay`
+      minor_changes:
+      - Set async log collection default once
+    fragments:
+    - fix_async_variable.yaml
+    - fix_workflow_variable_names.yaml
+    release_date: '2025-09-17'
+  3.8.0:
+    changes:
+      bugfixes:
+      - Add enhance async handling to the controller_settings role
+      - Added logic to better label the collect_async_status role/tasks to more easily
+        understand where automation is at any given point
+      - Fix usage of aap_configuration_collect_logs variable
+      - Update role readme files to be consistently worded for the aap_configuration_collect_logs
+        variable
+      minor_changes:
+      - Added `gateway_role_definitions` role for AAP 2.6+
+      - Added `gateway_role_team_assignments` role for AAP 2.6+
+      - Updated `gateway_role_user_assignments` role these changes will only work
+        in AAP 2.6+
+      - added include_wildcard_vars option to dispatch role.
+      - updated vars to `hub_` from `ah_` that were missed in hub_publish role
+    fragments:
+    - aap_26_additions.yml
+    - async_fixes.yml
+    - async_improved_logging.yml
+    - hub_publish.yml
+    - include_wildcard_vars.yml
+    release_date: '2025-10-06'
+  3.8.1:
+    changes:
+      bugfixes:
+      - Added `gateway_role_definitions` role to dispatch roles
+      - Added `gateway_role_team_assignments` role to dispatch roles
+      - Updated the async retries default to 50 for the roles to be consistent across
+        the collection.
+    fragments:
+    - new_dispatch_roles.yml
+    - updated_async_retries.yml
+    release_date: '2025-10-07'
+  3.8.2:
+    changes:
+      bugfixes:
+      - fixing gateway_role_definitions loop_var `__gateway_role_definition_item`
+        to `__gateway_role_definitions_item`
+      - fixing role_team_assignments var typo `__gateway_role_team_assignment_item`
+        to `__gateway_role_team_assignments_item`
+    fragments:
+    - fixing_role_def_loop.yml
+    - fixing_team_assign_loop.yml
+    - gateway_org_doc.yml
+    release_date: '2025-10-08'
+  3.8.3:
+    changes:
+      bugfixes:
+      - Unnecessary gather_facts set to false in configure_aap.yml
+    fragments:
+    - gather_face_false.yml
+    - trivial.yml
+    release_date: '2025-10-15'
+  3.8.4:
+    changes:
+      bugfixes:
+      - 'Add `kind: constructed` in controller_inventories role document'
+      - Fix missing wildcard variable tasks for gateway_http_portsgateway_role_definitions,
+        and gateway_role_team_assignments to ensure all variables defined in defaults
+        are properly handled
+      - Rename variable to fix conflict between hub_collections variable used in hub_collections
+        and hub_publish roles
+      - Updated get_stats playbook to have validate_certs be a var
+      - fixing eda roles that were missing aap_token arguments even though it was
+        shown in the arg spec
+      - fixing examples for gateway_role_definitions and gateway_role_team_assignments
+    fragments:
+    - 1223.yml
+    - fix_dispatch_wildcard_vars.yml
+    - fix_doc_inventories_kind.yml
+    - fix_examples.yml
+    - fix_hub_collections_conflict.yml
+    - get_stats.yml
+    - trivial_stuff.yml
+    release_date: '2025-11-15'
+  3.9.0:
+    changes:
+      bugfixes:
+      - Improve error handling output for collection uploads. Now displays path and
+        namespace.
+      minor_changes:
+      - added proxy option to eda_projects
+      - added the option of project sync to eda_projects
+    fragments:
+    - 1233.yml
+    - hub_collection_errors.yml
+    release_date: '2025-12-01'
+  3.9.1:
+    changes:
+      bugfixes:
+      - Fix wildcard variable handling for gateway_settings
+    fragments:
+    - fix_galaxy_settings_wildcard.yml
+    release_date: '2025-12-15'
+  4.0.0:
+    changes:
+      major_changes:
+      - Added ability to attach roles directly to projects, credentials, inventories,
+        instance groups, workflows and job_templates
+      - Adds ability to set a var to register values for each item, or as a whole
+        by setting `aap_configuration_register`.
+      minor_changes:
+      - Make it possible to exclude roles from the default list in the dispatch role
+      - Use just one task to combine wildcard variables in the dispatch role
+    fragments:
+    - dispatch_exclude_roles.yml
+    - dispatch_wildcore_one_task.yml
+    - register_values.yml
+    - role_apply.yml
+    release_date: '2026-01-07'
+  4.1.0:
+    changes:
+      minor_changes:
+      - Allow conditionally preventing object roles to be added to objects directly.
+    fragments:
+    - object_roles_conditional.yml
+    release_date: '2026-01-07'
+  4.2.0:
+    changes:
+      bugfixes:
+      - controller_license - Make controller_license role compatible with license
+        module by replacing pool_id parameter with subscription_id.
+      - controller_license - remove eula_accepted which has been deprecated and effectively
+        removed by being unusable with this collection for many versions.
+      minor_changes:
+      - Add role for creation of EDA credential input sources.
+      - Avoid duplicates in hub_configuration_dispatcher_roles and allow including
+        publish roles
+      - Correctly set task labels during workflow management
+      - Use labels where appropriate in hub_publish
+    fragments:
+    - controller_license.yml
+    - controller_license_subscription_id.yml
+    - dispatch_hub_roles.yml
+    - eda_credential_input_sources_role.yml
+    - hub_publish_labels.yml
+    - workflow_task_labels.yml
+    release_date: '2026-01-15'
+  4.2.1:
+    changes:
+      bugfixes:
+      - Fix incorrectly applied direct roles to projects
+    fragments:
+    - role_apply_project.yml
+    release_date: '2026-02-01'
+  4.3.0:
+    changes:
+      bugfixes:
+      - Fix "argument 'variables' is of type str" error on ansible 2.19+ by avoiding
+        regex_replace on non-string values.
+      - Fix EDA credentials failing when inputs is not specified by defaulting to
+        an empty dict when state is present.
+      - Fix controller_license argument_specs, re-allow parameters that should be
+        allowed
+      - Fix dispatch ordering so credential_types, credentials, and credential_input_sources
+        are processed before instance_groups.
+      - Fix gateway_users role sending default password when none specified, causing
+        failures for externally authenticated users.
+      - Fix role assignment failing when users/teams are specified as lists in job_templates,
+        inventories, and workflow_job_templates roles blocks.
+      - Fixed labels and notification_templates not being applied when defined directly
+        in user data because the Jinja2 expressions checked ``related.*`` (API-exported
+        format) before the direct user value. Reordered the fallback chain to check
+        the direct value first, matching the existing correct pattern used by ``credentials``.
+        Affected roles - controller_job_templates, controller_schedules, controller_workflow_job_templates,
+        controller_projects, controller_inventory_sources, controller_organizations,
+        gateway_organizations (https://github.com/redhat-cop/infra.aap_configuration/issues/1270).
+      - Removing enforce defaults for schedules on execution environments because
+        the it causes the api to return an error
+      - api endpoint for get_stats playbook was incorrect, fixed to match the correct
+        endpoint for users and subscription info
+      minor_changes:
+      - Add hub_repository variable to hub_publish role allowing collections to be
+        published to any repository, not just staging.
+      - Added the controller_role_definitions role; this allows AAP 2.5 compatibility
+        with creating roles
+    fragments:
+    - 1014-fix-dispatch-ordering.yml
+    - 1039-ldap-authenticator-map-examples.yml
+    - 1068-controller-license-auth-docs.yml
+    - 1216-constructed-inventory-docs.yml
+    - 1270-fix-labels-and-notification-templates-precedence.yml
+    - 1271-eda-rulebook-event-streams-docs.yml
+    - 1278-fix-eda-credentials-inputs.yml
+    - 1283-get_stats-url-fix.yml
+    - 1286-hub-publish-repository.yml
+    - 1287-fix-variables-argument-type-str.yml
+    - 1291-add_credentials-count-fix.yml
+    - 1295-fix.yml
+    - 1296-fix-role-assignment-lists.yml
+    - 1313-gateway-users-no-default-password.yml
+    - add_controller_role_definitions_role.yml
+    - fix_controller_license_argument_spec.yml
+    - pre-commit-update.yml
+    release_date: '2026-03-19'
+  4.4.0:
+    changes:
+      bugfixes:
+      - Added tag 'always' to tasks in the dispatch role for include_wildcard_vars
+        to ensure they run regardless of applied tags.
+      minor_changes:
+      - Added controller_role_user_assignments and controller_role_team_assignments
+        to support AAP 2.5 and custom role definitions.
+    fragments:
+    - 1327-readme-fix.yml
+    - add_role_to_collection.yml
+    - dispatch_tags.yml
+    - trivial.yml
+    - update_gateway_role_definitions_readme.yml
+    release_date: '2026-04-15'

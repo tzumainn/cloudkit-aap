@@ -19,11 +19,13 @@ ansible-galaxy collection install -r tests/collections/requirements.yml to be in
 |`aap_password`|""|no|Platform Admin User's password on the Server.  This should be stored in an Ansible Vault at vars/platform-secrets.yml or elsewhere and called from a parent playbook.||
 |`aap_token`|""|no|Controller Admin User's token on the Ansible Automation Platform Server. This should be stored in an Ansible Vault at or elsewhere and called from a parent playbook. Either username / password or oauthtoken need to be specified.||
 |`aap_request_timeout`|`10`|no|Specify the timeout in seconds Ansible should use in requests to the Ansible Automation Platform host.||
+|`aap_configuration_collect_logs`|`false`|no|Specify whether to collect async results and continue for all failed async tasks instead of failing on the first error. Collected results are available in the `aap_configuration_role_errors` variable.||
+|`aap_configuration_register`|""|no|Specify a variable to register the values of all aap_configuration tasks. This will create an object with each aap object as an element containing a list of each item created.||
 |`controller_instance_groups`|`see below`|yes|Data structure describing your instance groups Described below.||
 
 ### Enforcing defaults
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, enforcing default values is not done.
 Enabling these variables enforce default values on options that are optional in the controller API.
 This should be enabled to enforce configuration and prevent configuration drift. It is recommended to be enabled, however it is not enforced by default.
@@ -39,7 +41,7 @@ Enabling this will enforce configuration without specifying every option in the 
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
 The role defaults to false as normally the add instance groups task does not include sensitive information.
 controller_configuration_instance_groups_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of controller configuration roles with a single variable, or for the user to selectively use it.
@@ -58,7 +60,7 @@ This also speeds up the overall role.
 
 |Variable Name|Default Value|Required|Description|
 |:---:|:---:|:---:|:---:|
-|`aap_configuration_async_retries`|30|no|This variable sets the number of retries to attempt for the role globally.|
+|`aap_configuration_async_retries`|50|no|This variable sets the number of retries to attempt for the role globally.|
 |`controller_configuration_instance_groups_async_retries`|`{{ aap_configuration_async_retries }}`|no|This variable sets the number of retries to attempt for the role.|
 |`aap_configuration_async_delay`|1|no|This sets the delay between retries for the role globally.|
 |`controller_configuration_instance_groups_async_delay`|`aap_configuration_async_delay`|no|This sets the delay between retries for the role.|
@@ -84,6 +86,26 @@ This also speeds up the overall role.
 |`pod_spec_override`|""|no|str|A custom Kubernetes or OpenShift Pod specification.|
 |`instances`|""|no|list|The instances associated with this instance_group.|
 |`state`|`present`|no|str|Desired state of the resource.|
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
+|`roles`|""|no|obj|Controller roles to apply to the instance group. See roles section below for how to apply.|
+
+#### Applying roles to users or teams
+
+You can apply roles to users or teams using the `roles` field. This is applied as a dictionary as follows:
+
+```yaml
+- name: my_instance_group
+  roles:
+    use:
+      teams:
+        - myteam1
+        - myteam2
+    admin:
+      users:
+        - sysadmin1
+```
+
+This functionality can be disabled by setting `aap_configuration_apply_object_roles` as `false`.
 
 ### Standard Instance Group Data Structure
 
@@ -104,8 +126,8 @@ controller_instance_groups:
 - name: Playbook to configure ansible controller post installation
   hosts: localhost
   connection: local
-  # Define following vars here, or in platform_configs/controller_auth.yml
-  # aap_hostname: ansible-controller-web-svc-test-project.example.com
+  # Define following vars here, or in aap_configs/auth.yml
+  # aap_hostname: aap.example.com
   # aap_username: admin
   # aap_password: changeme
   pre_tasks:
@@ -120,7 +142,7 @@ controller_instance_groups:
 
 ## License
 
-[GPL-3.0](https://github.com/redhat-cop/aap_configuration#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 

@@ -13,16 +13,18 @@ An Ansible Role to create a Collection Remote Repository.
 |`aap_password`|""|no|Platform Admin User's password on the Server.  This should be stored in an Ansible Vault at vars/platform-secrets.yml or elsewhere and called from a parent playbook.||
 |`aap_validate_certs`|`true`|no|Whether or not to validate the Ansible Automation Platform Server's SSL certificate.||
 |`aap_request_timeout`|`10`|no|Specify the timeout Ansible should use in requests to the Galaxy or Automation Hub host.||
+|`aap_configuration_collect_logs`|`false`|no|Specify whether to collect async results and continue for all failed async tasks instead of failing on the first error. Collected results are available in the `aap_configuration_role_errors` variable.||
+|`aap_configuration_register`|""|no|Specify a variable to register the values of all aap_configuration tasks. This will create an object with each aap object as an element containing a list of each item created.||
 |`hub_path_prefix`|""|no|API path used to access the api. Either galaxy, automation-hub, or custom||
 |`aap_configuration_async_dir`|`null`|no|Sets the directory to write the results file for async tasks. The default value is set to `null` which uses the Ansible Default of `/root/.ansible_async/`.||
 |`hub_collection_remotes`|`see below`|yes|Data structure describing your collection remote repository, described below.||
 
 The `aap_configuration_async_dir` variable sets the directory to write the results file for async tasks.
-The default value is set to  `null` which uses the Ansible Default of `/root/.ansible_async/`.
+The default value is set to `null` which uses the Ansible Default of `/root/.ansible_async/`.
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
 The role defaults to false as normally the add repository task does not include sensitive information.
 hub_configuration_repository_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of automation hub configuration roles with a single variable, or for the user to selectively use it.
@@ -56,14 +58,14 @@ This also speeds up the overall role.
 
 |Variable Name|Default Value|Required|Description|Example|
 |:---:|:---:|:---:|:---:|:---:|
-|`name`|``|yes| Repository name. Probably one of community, validated, or rh-certified||
+|`name`|``|yes|Repository name. Probably one of community, validated, or rh-certified||
 |`url`|`https://cloud.redhat.com/api/automation-hub/`|no|(`ah_repository_certified`)Remote URL for the repository.|`https://console.redhat.com/api/automation-hub/content/`|
 |`url`|`https://galaxy.ansible.com/api/`|no|(`ah_repository_community`)Remote URL for the repository.||
 |`auth_url`|`https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token`|no|(`ah_repository_certified`)Remote URL for the repository authentication if separate.||
 |`token`|``|no|Token to authenticate to the remote repository.||
 |`policy`|`immediate`|no|The policy to use when downloading content. Can be one of `immediate`, `When syncing, download all metadata and content now.`.||
 |`requirements`|``|no|Requirements, a list of collections in [requirements file format](https://docs.ansible.com/ansible/latest/collections_guide/collections_installing.html#install-multiple-collections-with-a-requirements-file) to limit the download from remote. This will only download provided collections. This is only the list under collections. See examples for usage.||
-|`requirements_file`|``|no|A yaml requirements file to download from remote. In requirements file format. Exclusive with `requirements` ||
+|`requirements_file`|``|no|A yaml requirements file to download from remote. In requirements file format. Exclusive with `requirements`||
 |`username`|``|no|Username to authenticate to the remote repository.||
 |`password`|``|no|Password to authenticate to the remote repository.||
 |`tls_validation`|`true`|no|Whether to use TLS validation against the remote repository|true|
@@ -73,7 +75,7 @@ This also speeds up the overall role.
 |`client_key_path`|``|no|Path to a PEM encoded private key file used for authentication||
 |`client_cert_path`|``|no|Path to a PEM encoded client certificate used for authentication||
 |`ca_cert_path`|``|no|Path to a PEM encoded CA certificate used for authentication||
-|`download_concurrency`|`10`|no| Number of concurrent collections to download.||
+|`download_concurrency`|`10`|no|Number of concurrent collections to download.||
 |`max_retries`|`0`|no|Retries to use when running sync. Default is 0 which does not limit.||
 |`rate_limit`|`8`|no|Limits total download rate in requests per second.||
 |`signed_only`|`false`|no|Only download signed collections|false|
@@ -82,6 +84,7 @@ This also speeds up the overall role.
 |`proxy_username`|``|no|The username for the proxy authentication. Defaults to global `proxy_username` variable.||
 |`proxy_password`|``|no|The password for the proxy authentication. Defaults to global `proxy_password` variable.||
 |`state`|`present`|no|Desired state of the collection_remote. Either `present` or `absent`.||
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
 
 ### Standard Project Data Structure
 
@@ -124,4 +127,4 @@ hub_collection_remotes:
 
 ## License
 
-[GPLv3+](https://github.com/ansible/galaxy_collection#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)

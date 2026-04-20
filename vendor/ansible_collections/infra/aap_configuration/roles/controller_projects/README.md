@@ -19,11 +19,12 @@ ansible-galaxy collection install -r tests/collections/requirements.yml to be in
 |`aap_password`|""|no|str|Controller Admin User's password on the Ansible Controller Server. This should be stored in an Ansible Vault at vars/controller-secrets.yml or elsewhere and called from a parent playbook. Either username / password or oauthtoken need to be specified.||
 |`controller_oauthtoken`|""|no|str|Controller Admin User's token on the Ansible Controller Server. This should be stored in an Ansible Vault at or elsewhere and called from a parent playbook. Either username / password or oauthtoken need to be specified.||
 |`controller_request_timeout`|`10`|no|int|Specify the timeout in seconds Ansible should use in requests to the Ansible Automation Platform host.||
-|`controller_projects`|`see below`|yes|str|Data structure describing your project or projects Described below. Alias: projects ||
+|`aap_configuration_collect_logs`|`false`|no|bool|Specify whether to collect async results and continue for all failed async tasks instead of failing on the first error. Collected results are available in the `aap_configuration_role_errors` variable.||
+|`controller_projects`|`see below`|yes|str|Data structure describing your project or projects Described below. Alias: projects||
 
 ### Enforcing defaults
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, enforcing default values is not done.
 Enabling these variables enforce default values on options that are optional in the controller API.
 This should be enabled to enforce configuration and prevent configuration drift. It is recommended to be enabled, however it is not enforced by default.
@@ -39,7 +40,7 @@ Enabling this will enforce configuration without specifying every option in the 
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
 The role defaults to false as normally the add projects task does not include sensitive information.
 controller_configuration_projects_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of configuration roles with a single variable, or for the user to selectively use it.
@@ -58,7 +59,7 @@ This also speeds up the overall role.
 
 |Variable Name|Default Value|Required|Type|Description|
 |:---:|:---:|:---:|:---:|:---|
-|`aap_configuration_async_retries`|30|no|str|This variable sets the number of retries to attempt for the role globally.|
+|`aap_configuration_async_retries`|50|no|str|This variable sets the number of retries to attempt for the role globally.|
 |`controller_configuration_projects_async_retries`|`{{ aap_configuration_async_retries }}`|no|str|This variable sets the number of retries to attempt for the role.|
 |`aap_configuration_async_delay`|1|no|str|This sets the delay between retries for the role globally.|
 |`controller_configuration_projects_async_delay`|`aap_configuration_async_delay`|no|str|This sets the delay between retries for the role.|
@@ -97,9 +98,33 @@ This also speeds up the overall role.
 |`notification_templates_success`|""|no|list|The notifications on success to use for this organization in a list.|
 |`notification_templates_error`|""|no|list|The notifications on error to use for this organization in a list.|
 |`state`|`present`|no|str|Desired state of the resource.|
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
 |`wait`|""|no|bool|Provides option to wait for completed project sync before returning.|
 |`update_project`|`false`|no|bool|Force project to update after changes.Used in conjunction with wait, interval, and timeout.|
 |`interval`|`controller_configuration_projects_async_delay`|no|float|The interval to request an update from controller. Requires wait.|
+|`roles`|""|no|obj|Controller roles to apply to the project. See roles section below for how to apply.|
+
+#### Applying roles to users or teams
+
+You can apply roles to users or teams using the `roles` field. This is applied as a dictionary as follows:
+
+```yaml
+- name: my_project
+  roles:
+    use:
+      teams:
+        - myteam1
+        - myteam2
+    admin:
+      users:
+        - sysadmin1
+    update:
+      teams:
+        - myteam1
+        - myteam2
+```
+
+This functionality can be disabled by setting `aap_configuration_apply_object_roles` as `false`.
 
 ### Standard Project Data Structure
 
@@ -153,8 +178,8 @@ controller_projects:
 - name: Playbook to configure ansible controller post installation
   hosts: localhost
   connection: local
-  # Define following vars here, or in platform_configs/controller_auth.yml
-  # aap_hostname: ansible-controller-web-svc-test-project.example.com
+  # Define following vars here, or in aap_configs/auth.yml
+  # aap_hostname: aap.example.com
   # aap_username: admin
   # aap_password: changeme
   pre_tasks:
@@ -169,7 +194,7 @@ controller_projects:
 
 ## License
 
-[GPL-3.0](https://github.com/redhat-cop/aap_configuration#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 

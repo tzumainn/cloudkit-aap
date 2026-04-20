@@ -18,18 +18,20 @@ ansible-galaxy collection install -r tests/collections/requirements.yml to be in
 |`aap_password`|""|no|Controller Admin User's password on the Ansible Controller Server. This should be stored in an Ansible Vault at vars/controller-secrets.yml or elsewhere and called from a parent playbook. Either username / password or oauthtoken need to be specified.||
 |`controller_oauthtoken`|""|no|Controller Admin User's token on the Ansible Controller Server. This should be stored in an Ansible Vault at or elsewhere and called from a parent playbook. Either username / password or oauthtoken need to be specified.||
 |`controller_request_timeout`|`10`|no|Specify the timeout in seconds Ansible should use in requests to the Ansible Automation Platform host.||
-|`controller_configuration_bulk_hosts_secure_logging`|`see below`|yes|Data structure describing your organization or organizations Described below.||
+|`aap_configuration_collect_logs`|`false`|no|Specify whether to collect async results and continue for all failed async tasks instead of failing on the first error. Collected results are available in the `aap_configuration_role_errors` variable.||
+|`aap_configuration_register`|""|no|Specify a variable to register the values of all aap_configuration tasks. This will create an object with each aap object as an element containing a list of each item created.||
+|`controller_bulk_hosts`|`see below`|yes|Data structure describing the hosts to bulk create Described below.||
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
-The role defaults to false as normally the add ******* task does not include sensitive information.
-controller_configuration_*******_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of controller configuration roles with a single variable, or for the user to selectively use it.
+The role defaults to false as normally the add bulk host create task does not include sensitive information.
+controller_configuration_bulk_hosts_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of controller configuration roles with a single variable, or for the user to selectively use it.
 
 |Variable Name|Default Value|Required|Description|
 |:---:|:---:|:---:|:---:|
-|`controller_configuration_bulk_hosts_secure_logging`|`false`|no|Whether or not to include the sensitive ******* role tasks in the log. Set this value to `true` if you will be providing your sensitive values from elsewhere.|
+|`controller_configuration_bulk_hosts_secure_logging`|`false`|no|Whether or not to include the sensitive bulk_host_create role tasks in the log. Set this value to `true` if you will be providing your sensitive values from elsewhere.|
 |`aap_configuration_secure_logging`|`false`|no|This variable enables secure logging as well, but is shared across multiple roles, see above.|
 
 ### Asynchronous Retry Variables
@@ -41,7 +43,7 @@ This also speeds up the overall role.
 
 |Variable Name|Default Value|Required|Description|
 |:---:|:---:|:---:|:---:|
-|`aap_configuration_async_retries`|30|no|This variable sets the number of retries to attempt for the role globally.|
+|`aap_configuration_async_retries`|50|no|This variable sets the number of retries to attempt for the role globally.|
 |`controller_configuration_bulk_hosts_async_retries`|`{{ aap_configuration_async_retries }}`|no|This variable sets the number of retries to attempt for the role.|
 |`aap_configuration_async_delay`|1|no|This sets the delay between retries for the role globally.|
 |`controller_configuration_bulk_hosts_async_delay`|`aap_configuration_async_delay`|no|This sets the delay between retries for the role.|
@@ -57,6 +59,7 @@ This also speeds up the overall role.
 |:---:|:---:|:---:|:---:|:---:|
 |`hosts`|""|yes|list|List of hosts and host options to add to inventory. Documented below|
 |`inventory`|""|yes|str|Inventory name or ID the hosts should be made a member of.|
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
 
 ### Bulk Host Sub Options
 
@@ -117,8 +120,8 @@ controller_bulk_hosts:
 - name: Playbook to configure ansible controller post installation
   hosts: localhost
   connection: local
-  # Define following vars here, or in platform_configs/controller_auth.yml
-  # aap_hostname: ansible-controller-web-svc-test-project.example.com
+  # Define following vars here, or in aap_configs/auth.yml
+  # aap_hostname: aap.example.com
   # aap_username: admin
   # aap_password: changeme
   pre_tasks:
@@ -133,7 +136,7 @@ controller_bulk_hosts:
 
 ## License
 
-[GPL-3.0](https://github.com/redhat-cop/aap_configuration#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 

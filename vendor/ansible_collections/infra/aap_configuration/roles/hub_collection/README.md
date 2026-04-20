@@ -13,6 +13,8 @@ An Ansible Role to update, or destroy Automation Hub Collections.
 |`aap_password`|""|no|Platform Admin User's password on the Server.  This should be stored in an Ansible Vault at vars/platform-secrets.yml or elsewhere and called from a parent playbook.||
 |`aap_validate_certs`|`true`|no|Whether or not to validate the Ansible Automation Platform Server's SSL certificate.||
 |`aap_request_timeout`|`10`|no|Specify the timeout Ansible should use in requests to the Galaxy or Automation Hub host.||
+|`aap_configuration_collect_logs`|`false`|no|Specify whether to collect async results and continue for all failed async tasks instead of failing on the first error. Collected results are available in the `aap_configuration_role_errors` variable.||
+|`aap_configuration_register`|""|no|Specify a variable to register the values of all aap_configuration tasks. This will create an object with each aap object as an element containing a list of each item created.||
 |`hub_path_prefix`|""|no|API path used to access the api. Either galaxy, automation-hub, or custom||
 |`aap_configuration_async_dir`|`null`|no|Sets the directory to write the results file for async tasks. The default value is set to `null` which uses the Ansible Default of `/root/.ansible_async/`.||
 |`hub_collections`|`see below`|yes|Data structure describing your collections, described below.||
@@ -31,6 +33,7 @@ These are the sub options for the vars `hub_collections` which are dictionaries 
 |`interval`|"true"|10|Interval at which approval is checked||
 |`overwrite_existing`|"false"|no|Overwrites an existing collection and requires version to be set.||
 |`state`|"present"|no|Desired state of the resource||
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
 
 The `aap_configuration_async_dir` variable sets the directory to write the results file for async tasks.
 The default value is set to  `null` which uses the Ansible Default of `/root/.ansible_async/`.
@@ -55,7 +58,7 @@ This also speeds up the overall role.
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
 The role defaults to false as normally the add repository task does not include sensitive information.
 hub_configuration_repository_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of automation hub configuration roles with a single variable, or for the user to selectively use it.
@@ -113,7 +116,7 @@ hub_collections:
 
 ## License
 
-[GPLv3+](https://github.com/ansible/galaxy_collection#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 
