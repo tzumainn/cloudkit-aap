@@ -62,6 +62,33 @@
     - name: Run create tests
       when: run_create | default(true) | bool
       block:
+        - name: Check IPAddressPool does not already exist
+          kubernetes.core.k8s_info:
+            api_version: metallb.io/v1beta1
+            kind: IPAddressPool
+            name: "{{ test_pool_name }}"
+            namespace: metallb-system
+          register: pre_create_pool
+
+        - name: Check L2Advertisement does not already exist
+          kubernetes.core.k8s_info:
+            api_version: metallb.io/v1beta1
+            kind: L2Advertisement
+            name: "{{ test_pool_name }}-l2adv"
+            namespace: metallb-system
+          register: pre_create_l2adv
+
+        - name: Assert clean state before create
+          ansible.builtin.assert:
+            that:
+              - pre_create_pool.resources | length == 0
+              - pre_create_l2adv.resources | length == 0
+            fail_msg: >-
+              Stale test resources exist from a previous run. Clean up with:
+              oc delete ipaddresspool {{ test_pool_name }} -n metallb-system --ignore-not-found &&
+              oc delete l2advertisement {{ test_pool_name }}-l2adv -n metallb-system --ignore-not-found
+            success_msg: "No stale resources, proceeding with create"
+
         - name: Create MetalLB resources via metallb_l2 role
           ansible.builtin.include_role:
             name: osac.templates.metallb_l2
@@ -115,6 +142,27 @@
               - l2advertisement_result.resources[0].metadata.labels['osac.io/managed-by'] == 'osac-fulfillment'
             fail_msg: "L2Advertisement labels incorrect"
             success_msg: "L2Advertisement labels correct"
+
+      always:
+        - name: Clean up IPAddressPool on failure
+          kubernetes.core.k8s:
+            api_version: metallb.io/v1beta1
+            kind: IPAddressPool
+            name: "{{ test_pool_name }}"
+            namespace: metallb-system
+            state: absent
+          when: ansible_failed_result is defined
+          ignore_errors: true
+
+        - name: Clean up L2Advertisement on failure
+          kubernetes.core.k8s:
+            api_version: metallb.io/v1beta1
+            kind: L2Advertisement
+            name: "{{ test_pool_name }}-l2adv"
+            namespace: metallb-system
+            state: absent
+          when: ansible_failed_result is defined
+          ignore_errors: true
 
 # ──────────────────────────────────────────────────────────────
 # Test: Delete IPAddressPool and L2Advertisement
