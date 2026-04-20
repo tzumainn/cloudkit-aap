@@ -15,13 +15,27 @@
 #   ansible-playbook test.yml -v
 #
 #   # Run only create tests
-#   ansible-playbook test.yml -e run_create=true -v
+#   ansible-playbook test.yml -e run_create=true -e run_delete=false -e run_delete_not_found=false -v
 #
 #   # Run only delete tests (resources must already exist)
-#   ansible-playbook test.yml -e run_delete=true -v
+#   ansible-playbook test.yml -e run_delete=true -e run_create=false -e run_delete_not_found=false -v
 #
 #   # Run only delete-not-found test (resources must NOT exist)
-#   ansible-playbook test.yml -e run_delete_not_found=true -v
+#   ansible-playbook test.yml -e run_delete_not_found=true -e run_create=false -e run_delete=false -v
+
+# ──────────────────────────────────────────────────────────────
+# Pre-flight: fail fast if OSAC_REMOTE_CLUSTER_KUBECONFIG is set
+# ──────────────────────────────────────────────────────────────
+- name: Validate metallb_l2 test environment
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Fail if OSAC_REMOTE_CLUSTER_KUBECONFIG is set
+      ansible.builtin.fail:
+        msg: >-
+          OSAC_REMOTE_CLUSTER_KUBECONFIG is set. This test expects the role to
+          use the default kubeconfig. Unset the variable before running tests.
+      when: lookup('env', 'OSAC_REMOTE_CLUSTER_KUBECONFIG') | length > 0
 
 # ──────────────────────────────────────────────────────────────
 # Test: Create IPAddressPool and L2Advertisement
@@ -121,6 +135,30 @@
     - name: Run delete tests
       when: run_delete | default(true) | bool
       block:
+        - name: Verify IPAddressPool exists before delete
+          kubernetes.core.k8s_info:
+            api_version: metallb.io/v1beta1
+            kind: IPAddressPool
+            name: "{{ test_pool_name }}"
+            namespace: metallb-system
+          register: pre_delete_pool
+
+        - name: Verify L2Advertisement exists before delete
+          kubernetes.core.k8s_info:
+            api_version: metallb.io/v1beta1
+            kind: L2Advertisement
+            name: "{{ test_pool_name }}-l2adv"
+            namespace: metallb-system
+          register: pre_delete_l2adv
+
+        - name: Assert resources exist (otherwise delete test is meaningless)
+          ansible.builtin.assert:
+            that:
+              - pre_delete_pool.resources | length == 1
+              - pre_delete_l2adv.resources | length == 1
+            fail_msg: "Resources do not exist before delete. Run create tests first or run all tests together."
+            success_msg: "Both resources exist, proceeding with delete"
+
         - name: Delete MetalLB resources via metallb_l2 role
           ansible.builtin.include_role:
             name: osac.templates.metallb_l2
@@ -175,6 +213,30 @@
     - name: Run delete-not-found test
       when: run_delete_not_found | default(true) | bool
       block:
+        - name: Verify IPAddressPool is absent before NotFound test
+          kubernetes.core.k8s_info:
+            api_version: metallb.io/v1beta1
+            kind: IPAddressPool
+            name: "{{ test_pool_name }}"
+            namespace: metallb-system
+          register: pre_notfound_pool
+
+        - name: Verify L2Advertisement is absent before NotFound test
+          kubernetes.core.k8s_info:
+            api_version: metallb.io/v1beta1
+            kind: L2Advertisement
+            name: "{{ test_pool_name }}-l2adv"
+            namespace: metallb-system
+          register: pre_notfound_l2adv
+
+        - name: Assert resources are absent (otherwise this is not a NotFound test)
+          ansible.builtin.assert:
+            that:
+              - pre_notfound_pool.resources | length == 0
+              - pre_notfound_l2adv.resources | length == 0
+            fail_msg: "Resources still exist. Run delete tests first or clean up manually."
+            success_msg: "Both resources absent, proceeding with NotFound test"
+
         - name: Delete already-gone resources (should not fail)
           ansible.builtin.include_role:
             name: osac.templates.metallb_l2
