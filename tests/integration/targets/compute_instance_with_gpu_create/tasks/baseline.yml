@@ -1,0 +1,43 @@
+---
+- name: Compute Instance Create GPU - Baseline Test
+  hosts: localhost
+  gather_facts: true
+  vars_files:
+    - ../../../common_vars.yml
+
+  tasks:
+    - name: Read ComputeInstance GPU fixture
+      ansible.builtin.set_fact:
+        test_compute_instance: "{{ lookup('file', '../../../fixtures/computeinstance-with-gpu-test.yaml') | from_yaml }}"
+
+    - name: Set test variables for baseline workflow
+      ansible.builtin.set_fact:
+        ansible_eda:
+          event:
+            payload: "{{ test_compute_instance }}"
+        compute_instance_working_namespace: "computeinstance-test-vm-gpu-work"
+        create_step_resources_override:
+          name: osac.workflows.workflow_helpers
+          tasks_from: noop.yml
+        create_step_wait_annotate_override:
+          name: osac.workflows.workflow_helpers
+          tasks_from: noop.yml
+
+- name: Import compute instance create workflow (baseline with GPU)
+  ansible.builtin.import_playbook: osac.workflows.compute_instance.create
+
+- name: Verify baseline results with GPU
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../../common_vars.yml
+
+  tasks:
+    - name: Verify GPU host device is present in VM template spec
+      ansible.builtin.assert:
+        that:
+          - vm_template_spec is defined
+          - vm_template_spec.domain.devices.hostDevices is defined
+          - vm_template_spec.domain.devices.hostDevices | length > 0
+          - vm_template_spec.domain.devices.hostDevices | selectattr('deviceName', 'equalto', 'nvidia.com/GB100') | list | length > 0
+        fail_msg: "GPU device not found in VM template spec: {{ vm_template_spec }}"
