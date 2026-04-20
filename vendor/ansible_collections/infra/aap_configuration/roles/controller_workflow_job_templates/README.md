@@ -19,11 +19,13 @@ ansible-galaxy collection install -r tests/collections/requirements.yml to be in
 |`aap_password`|""|no|Platform Admin User's password on the Server.  This should be stored in an Ansible Vault at vars/platform-secrets.yml or elsewhere and called from a parent playbook.||
 |`aap_token`|""|no|Controller Admin User's token on the Ansible Automation Platform Server. This should be stored in an Ansible Vault at or elsewhere and called from a parent playbook. Either username / password or oauthtoken need to be specified.||
 |`aap_request_timeout`|`10`|no|Specify the timeout in seconds Ansible should use in requests to the Ansible Automation Platform host.||
-|`controller_workflows`|`see below`|yes|Data structure describing your workflow job templates described below. Alias: workflow_job_templates ||
+|`aap_configuration_collect_logs`|`false`|no|Specify whether to collect async results and continue for all failed async tasks instead of failing on the first error. Collected results are available in the `aap_configuration_role_errors` variable.||
+|`aap_configuration_register`|""|no|Specify a variable to register the values of all aap_configuration tasks. This will create an object with each aap object as an element containing a list of each item created.||
+|`controller_workflows`|`see below`|yes|Data structure describing your workflow job templates described below. Alias: workflow_job_templates||
 
 ### Enforcing defaults
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, enforcing default values is not done.
 Enabling these variables enforce default values on options that are optional in the controller API.
 This should be enabled to enforce configuration and prevent configuration drift. It is recommended to be enabled, however it is not enforced by default.
@@ -39,14 +41,14 @@ Enabling this will enforce configuration without specifying every option in the 
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
 The role defaults to false as normally the add Workflow Job Templates task does not include sensitive information.
-workflow_job_templates_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of genie roles with a single variable, or for the user to selectively use it.
+controller_configuration_workflow_job_templates_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of genie roles with a single variable, or for the user to selectively use it.
 
 |Variable Name|Default Value|Required|Description|
 |:---:|:---:|:---:|:---:|
-|`workflow_job_templates_secure_logging`|`false`|no|Whether or not to include the sensitive Workflow Job Templates role tasks in the log. Set this value to `true` if you will be providing your sensitive values from elsewhere.|
+|`controller_configuration_workflow_job_templates_secure_logging`|`false`|no|Whether or not to include the sensitive Workflow Job Templates role tasks in the log. Set this value to `true` if you will be providing your sensitive values from elsewhere.|
 |`aap_configuration_secure_logging`|`false`|no|This variable enables secure logging as well, but is shared across multiple roles, see above.|
 
 ### Asynchronous Retry Variables
@@ -58,12 +60,12 @@ This also speeds up the overall role.
 
 |Variable Name|Default Value|Required|Description|
 |:---:|:---:|:---:|:---:|
-|`aap_configuration_async_retries`|30|no|This variable sets the number of retries to attempt for the role globally.|
-|`controller_configuration_workflow_async_retries`|`{{ aap_configuration_async_retries }}`|no|This variable sets the number of retries to attempt for the role.|
+|`aap_configuration_async_retries`|50|no|This variable sets the number of retries to attempt for the role globally.|
+|`controller_configuration_workflow_job_templates_async_retries`|`{{ aap_configuration_async_retries }}`|no|This variable sets the number of retries to attempt for the role.|
 |`aap_configuration_async_delay`|1|no|This sets the delay between retries for the role globally.|
-|`controller_configuration_workflow_async_delay`|`aap_configuration_async_delay`|no|This sets the delay between retries for the role.|
+|`controller_configuration_workflow_job_templates_async_delay`|`aap_configuration_async_delay`|no|This sets the delay between retries for the role.|
 |`aap_configuration_loop_delay`|0|no|This sets the pause between each item in the loop for the roles globally. To help when API is getting overloaded.|
-|`controller_configuration_workflow_loop_delay`|`aap_configuration_loop_delay`|no|This sets the pause between each item in the loop for the role. To help when API is getting overloaded.|
+|`controller_configuration_workflow_job_templates_loop_delay`|`aap_configuration_loop_delay`|no|This sets the pause between each item in the loop for the role. To help when API is getting overloaded.|
 |`aap_configuration_async_dir`|`null`|no|Sets the directory to write the results file for async tasks. The default value is set to `null` which uses the Ansible Default of `/root/.ansible_async/`.|
 
 ## Data Structure
@@ -97,6 +99,7 @@ This also speeds up the overall role.
 |`notification_templates_success`|""|no|list|The notifications on success to use for this organization in a list.|
 |`scm_branch`|""|no|str|SCM branch applied as a prompt, assuming job template prompts for SCM branch|
 |`state`|`present`|no|str|Desired state of the resource.|
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
 |`workflow_nodes`|""|no|dict|A json list of nodes and their corresponding options. The sub-options are in the module doc.|
 |`destroy_current_nodes`|""|no|bool|Set in order to destroy current schema on the workflow, used in cases where drastic changes to schema are happening.|
 |`survey_enabled`|""|no|bool|Enable a survey on the job template.|
@@ -104,6 +107,27 @@ This also speeds up the overall role.
 |`survey`|""|no|dict|JSON/YAML dict formatted survey definition. Alias of survey_spec|
 |`webhook_service`|""|no|str|Service that webhook requests will be accepted from (github, gitlab)|
 |`webhook_credential`|""|no|str|Personal Access Token for posting back the status to the service API|
+|`roles`|""|no|obj|Controller roles to apply to the workflow job template. See roles section below for how to apply.|
+
+#### Applying roles to users or teams
+
+You can apply roles to users or teams using the `roles` field. This is applied as a dictionary as follows:
+
+```yaml
+- name: my_wjt
+  roles:
+    execute:
+      teams:
+        - myteam1
+        - myteam2
+    admin:
+      users:
+        - sysadmin1
+    approve:
+      users: manager1
+```
+
+This functionality can be disabled by setting `aap_configuration_apply_object_roles` as `false`.
 
 ### Variables For Workflow Job Template Node
 
@@ -115,7 +139,7 @@ This also speeds up the overall role.
 |`lookup_organization`|""|no|str|Organization the inventories, job templates, projects, or workflows the items exists in. Used to help lookup the object, for organization roles see organization. If not provided, will lookup by name only, which does not work with duplicates.|
 |`execution_environment`|Job Template default|no|str|Execution Environment applied as a prompt. Job Template default used if not set. Only allowed if `ask_execution_environment_on_launch` set to true on Job Template|
 |`forks`|Job Template default|no|str|Forks applied as a prompt. Job Template default used if not set. Only allowed if `ask_forks_on_launch` set to true on Job Template|
-|`instance_groups`|Job Template default|no|str| List of Instance Groups applied as a prompt. Job Template default used if not set. Only allowed if `ask_instance_groups_on_launch` set to true on Job Template|
+|`instance_groups`|Job Template default|no|str|List of Instance Groups applied as a prompt. Job Template default used if not set. Only allowed if `ask_instance_groups_on_launch` set to true on Job Template|
 |`job_slice_count`|Job Template default|no|str|Job Slice Count to use in the job run. Job Template default used if not set. Only allowed if `ask_job_slice_count_on_launch` set to true on Job Template|
 |`labels`|Job Template default|no|list|List of labels to use in the job run. Job Template default used if not set. Only allowed if `ask_labels_on_launch` set to true on Job Template. NOTE: Labels must be created with the [labels](https://github.com/redhat-cop/aap_configuration/tree/devel/roles/controller_labels) role first, an error will occur if the label supplied to this role does not exist.|
 |`timeout`|Job Template default|no|str|Timeout to use in the job run. Job Template default used if not set. Only allowed if `ask_timeout_on_launch` set to true on Job Template|
@@ -127,6 +151,7 @@ This also speeds up the overall role.
 |`success_nodes`|""|no|list|Nodes that will run after this node completes.|
 |`verbosity`|""|no|str|Verbosity applied as a prompt, if job template prompts for verbosity|
 |`state`|""|no|str|Desired state of the resource|
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
 |`credentials`|""|no|list|Credentials to be applied to job as launch-time prompts.|
 |`diff_mode`|""|no|bool|Run diff mode, applied as a prompt, if job template prompts for diff mode|
 |`extra_data`|""|no|dict|Variables to apply at launch time. Will only be accepted if job template prompts for vars or has a survey asking for those vars. extra_data are extra_vars at the node level and named so to match the module and the API. These are only for "ask extra vars on prompt" on a given job template.|
@@ -277,24 +302,24 @@ controller_workflows:
           type: job_template
           organization:
             name: Default
-      notification_templates_started: []
-      notification_templates_success: []
-      notification_templates_error: []
-      notification_templates_approvals: []
-      survey_spec:
-        name: ''
-        description: ''
-        spec:
-          - question_name: Basic Name
-            question_description: Name
-            required: true
-            type: text
-            variable: basic_name
-            min: 0
-            max: 1024
-            default: ''
-            choices: ''
-            new_question: true
+    notification_templates_started: []
+    notification_templates_success: []
+    notification_templates_error: []
+    notification_templates_approvals: []
+    survey_spec:
+      name: ''
+      description: ''
+      spec:
+        - question_name: Basic Name
+          question_description: Name
+          required: true
+          type: text
+          variable: basic_name
+          min: 0
+          max: 1024
+          default: ''
+          choices: ''
+          new_question: true
 
 ```
 
@@ -407,8 +432,8 @@ controller_workflows:
 - name: Playbook to configure ansible controller post installation
   hosts: localhost
   connection: local
-  # Define following vars here, or in platform_configs/controller_auth.yml
-  # aap_hostname: ansible-controller-web-svc-test-project.example.com
+  # Define following vars here, or in aap_configs/auth.yml
+  # aap_hostname: aap.example.com
   # aap_username: admin
   # aap_password: changeme
   pre_tasks:
@@ -424,7 +449,7 @@ controller_workflows:
 
 ## License
 
-[GPL-3.0](https://github.com/redhat-cop/aap_configuration#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 

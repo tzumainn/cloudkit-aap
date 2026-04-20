@@ -14,12 +14,14 @@ An Ansible Role to create groups in Automation Hub.
 |`aap_validate_certs`|`true`|no|Whether or not to validate the Ansible Automation Platform Server's SSL certificate.||
 |`aap_request_timeout`|`10`|no|Specify the timeout Ansible should use in requests to the Galaxy or Automation Hub host.||
 |`hub_path_prefix`|""|no|API path used to access the api. Either galaxy, automation-hub, or custom||
+|`aap_configuration_collect_logs`|`false`|no|Specify whether to collect async results and continue for all failed async tasks instead of failing on the first error. Collected results are available in the `aap_configuration_role_errors` variable.||
+|`aap_configuration_register`|""|no|Specify a variable to register the values of all aap_configuration tasks. This will create an object with each aap object as an element containing a list of each item created.||
 |`aap_configuration_async_dir`|`null`|no|Sets the directory to write the results file for async tasks. The default value is set to `null` which uses the Ansible Default of `/root/.ansible_async/`.||
 |`ah_groups`|`see below`|yes|Data structure describing your groups, described below.||
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
 The role defaults to false as normally the add group task does not include sensitive information.
 hub_configuration_group_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of automation hub configuration roles with a single variable, or for the user to selectively use it.
@@ -54,6 +56,7 @@ This also speeds up the overall role.
 |`name`|""|yes|str|Group Name. Must be lower case containing only alphanumeric characters and underscores.|
 |`perms`|""|yes|str|The list of permissions to add to or remove from the given group. See below for options.|
 |`state`|`present`|no|str|Desired state of the group.|
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
 <!-- |`new_name`|""|yes|str|Setting this option will change the existing name (looked up via the name field.| -->
 #### perms
 
@@ -108,7 +111,7 @@ ah_groups:
 
 ## License
 
-[GPLv3+](https://github.com/ansible/galaxy_collection#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 

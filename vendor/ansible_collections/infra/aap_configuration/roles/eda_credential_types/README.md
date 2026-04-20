@@ -2,7 +2,7 @@
 
 ## Description
 
-An Ansible Role to create Credentials in EDA Controller.
+An Ansible Role to create Credential Types in EDA Controller.
 
 ## Variables
 
@@ -15,18 +15,20 @@ An Ansible Role to create Credentials in EDA Controller.
 |`aap_password`|""|no|Platform Admin User's password on the Server.  This should be stored in an Ansible Vault at vars/platform-secrets.yml or elsewhere and called from a parent playbook.||
 |`aap_token`|""|no|Controller Admin User's token on the Ansible Automation Platform Server. This should be stored in an Ansible Vault at or elsewhere and called from a parent playbook. Either username / password or oauthtoken need to be specified.||
 |`aap_request_timeout`|`10`|no|Specify the timeout in seconds Ansible should use in requests to the controller host.||
+|`aap_configuration_collect_logs`|`false`|no|Specify whether to collect async results and continue for all failed async tasks instead of failing on the first error. Collected results are available in the `aap_configuration_role_errors` variable.||
+|`aap_configuration_register`|""|no|Specify a variable to register the values of all aap_configuration tasks. This will create an object with each aap object as an element containing a list of each item created.||
 |`eda_credential_types`|`see below`|yes|Data structure describing your users Described below.||
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
 The role defaults to false as normally the add group_roles task does not include sensitive information.
 eda_configuration_credential_types_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of automation hub configuration roles with a single variable, or for the user to selectively use it.
 
 |Variable Name|Default Value|Required|Description|
 |:---:|:---:|:---:|:---:|
-|`eda_configuration_credential_types_secure_logging`|`false`|no|Whether or not to include the sensitive Registry role tasks in the log.  Set this value to `true` if you will be providing your sensitive values from elsewhere.|
+|`eda_configuration_credential_types_secure_logging`|`true`|no|Whether or not to include the sensitive Registry role tasks in the log.  Set this value to `true` if you will be providing your sensitive values from elsewhere.|
 |`aap_configuration_secure_logging`|`false`|no|Whether or not to include the sensitive Registry role tasks in the log.  Set this value to `true` if you will be providing your sensitive values from elsewhere.|
 
 ### Asynchronous Retry Variables
@@ -58,6 +60,7 @@ This also speeds up the overall role.
 |`inputs`|""|no|dict|Credential inputs where the keys are var names used in templating. Refer to the EDA controller documentation for example syntax.|
 |`injectors`|""|no|dict|Enter injectors using either JSON or YAML syntax. Refer to the Ansible controller documentation for example syntax. See below on proper formatting.|
 |`state`|`present`|no|str|Desired state of the credential.|
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
 
 ### Formatting Injectors
 
@@ -71,7 +74,7 @@ Example:
 
 Because of this it is difficult to provide controller with the required format for these fields.
 
-The workaround is easier to do in yaml with unsafe syntax, to read more about this check out the [documentation](https://docs.ansible.com/ansible/latest/user_guide/playbooks_advanced_syntax.html):
+The workaround is easier to do in yaml with unsafe syntax, to read more about this check out the [documentation](https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_advanced_syntax.html):
 
 ```yaml
 !unsafe '{{ variable }}'
@@ -87,7 +90,7 @@ The role will strip the double space between the curly bracket in order to provi
 
 ### Input and Injector Schema
 
-The following details the data format to use for inputs and injectors. These can be in either YAML or JSON For the most up to date information and more details see [Custom Credential Types - Ansible Controller Documentation](https://docs.ansible.com/automation-controller/latest/html/userguide/credential_plugins.html)
+The following details the data format to use for inputs and injectors. These can be in either YAML or JSON For the most up to date information and more details see [Custom Credential Types - Ansible Controller Documentation](https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.6/html/configuring_automation_execution/assembly-controller-secret-management)
 
 #### Input Schema
 
@@ -202,8 +205,8 @@ eda_credential_types:
 - name: Playbook to configure ansible controller post installation
   hosts: localhost
   connection: local
-  # Define following vars here, or in platform_configs/controller_auth.yml
-  # aap_hostname: ansible-controller-web-svc-test-project.example.com
+  # Define following vars here, or in aap_configs/auth.yml
+  # aap_hostname: aap.example.com
   # aap_username: admin
   # aap_password: changeme
   pre_tasks:
@@ -218,7 +221,7 @@ eda_credential_types:
 
 ## License
 
-[GPL-3.0](https://github.com/redhat-cop/aap_configuration#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 

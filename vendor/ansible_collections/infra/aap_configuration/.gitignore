@@ -1,3 +1,6 @@
+.env
+*.pem
+*.key
 collections/*
 !collections/requirements.yml
 *.tar.gz
@@ -9,3 +12,7 @@ tests/output
 ansible.cfg
 tests/localtest.yml
 .ansible/
+.venv
+.devcontainer
+ansible_collections/
+importer_result.json

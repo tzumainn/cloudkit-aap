@@ -13,13 +13,15 @@ An Ansible Role to index EE Registries in Automation Hub.
 |`aap_password`|""|no|Platform Admin User's password on the Server.  This should be stored in an Ansible Vault at vars/platform-secrets.yml or elsewhere and called from a parent playbook.||
 |`aap_validate_certs`|`true`|no|Whether or not to validate the Ansible Automation Platform Server's SSL certificate.||
 |`aap_request_timeout`|`10`|no|Specify the timeout Ansible should use in requests to the Galaxy or Automation Hub host.||
+|`aap_configuration_collect_logs`|`false`|no|Specify whether to collect async results and continue for all failed async tasks instead of failing on the first error. Collected results are available in the `aap_configuration_role_errors` variable.||
+|`aap_configuration_register`|""|no|Specify a variable to register the values of all aap_configuration tasks. This will create an object with each aap object as an element containing a list of each item created.||
 |`hub_path_prefix`|""|no|API path used to access the api. Either galaxy, automation-hub, or custom||
 |`aap_configuration_async_dir`|`null`|no|Sets the directory to write the results file for async tasks. The default value is set to `null` which uses the Ansible Default of `/root/.ansible_async/`.||
 |`hub_ee_registries`|`see below`|yes|Data structure describing your ee_registries, described below. (Note this is the same as for the `ee_registries` role and the variable can be combined). Note that this role will only do anything if the `index` sub-option of this variable is set to true.||
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
 The role defaults to false as normally the add ee_registry task does not include sensitive information.
 hub_configuration_ee_registry_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of automation hub configuration roles with a single variable, or for the user to selectively use it.
@@ -58,6 +60,7 @@ This also speeds up the overall role.
 |`wait`|true|no|str|Whether to wait for the indexing to complete|
 |`interval`|`hub_configuration_ee_registry_index_async_delay`|no|str|The interval which the indexing task will be checked for completion|
 |`timeout`|""|no|str|How long to wait for the indexing task to complete|
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
 
 ### Standard Project Data Structure
 
@@ -100,7 +103,7 @@ hub_ee_registries:
 
 ## License
 
-[GPLv3+](https://github.com/ansible/galaxy_collection#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 

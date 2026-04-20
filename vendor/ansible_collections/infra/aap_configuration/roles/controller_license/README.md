@@ -27,7 +27,7 @@ ansible-galaxy collection install -r tests/collections/requirements.yml to be in
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
 The role defaults to false as normally the add license task does not include sensitive information.
 controller_configuration_license_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of controller configuration roles with a single variable, or for the user to selectively use it.
@@ -53,7 +53,7 @@ The module and this role can use either a manifest file, or lookup the subscript
 |`manifest`|""|no|obj|DEPRECATED - changed to `manifest_file` (still works as an alias)|
 |`manifest_username`|""|no|obj|Optional username for access to `manifest_url`|
 |`manifest_password`|""|no|obj|Optional password for access to `manifest_url`|
-|`pool_id`|""|no|str|Red Hat or Red Hat Satellite pool_id to attach to|
+|`subscription_id`|""|no|str|Red Hat or Red Hat Satellite subscription_id to attach to|
 |`eula_accepted`|""|yes|bool|DEPRECATED since Tower 3.8 - Whether to accept the End User License Agreement for Ansible controller|
 |`force`|`false`|no|bool|By default, the license manifest will only be applied if controller is currently unlicensed or trial licensed. When force=true, the license is always applied.|
 |`state`|`present`|no|str|Desired state of the resource.|
@@ -65,7 +65,7 @@ The module and this role can use either a manifest file, or lookup the subscript
 |`filters`|"default values"|no|str|dict of filters to use to narrow the subscription. See example below for how to use this.|
 |`support_level`|"Self-Support"|no|str|DEPRECATED - changed to `manifest_file` (still works as an alias)|
 |`list_num`|0|no|int|List index of the subscription to use, if you want to override the default, it is recommended to use the filters to limit the pools found.|
-|`pool_id`|""|no|str|Red Hat or Red Hat Satellite pool_id to attach to.|
+|`subscription_id`|""|no|str|Red Hat or Red Hat Satellite subscription_id to attach to.|
 |`force`|`false`|no|bool|By default, the license will only be applied if controller is currently unlicensed or trial licensed. When force=true, the license is always applied.|
 |`use_lookup`|`false`|no|bool|Whether or not to lookup subscriptions.|
 |`state`|`present`|no|str|Desired state of the resource.|
@@ -98,15 +98,18 @@ controller_license:
 
 ### Standard Manifest Role Usage
 
+**Note:** Controller authentication is required for both manifest and subscription flows. You must provide either `aap_username`/`aap_password` or `aap_token` to authenticate against the controller.
+
 ```yaml
 ---
 - name: Playbook to configure ansible controller post installation
   hosts: localhost
   connection: local
-  # Define following vars here, or in platform_configs/controller_auth.yml
-  # aap_hostname: ansible-controller-web-svc-test-project.example.com
-  # aap_username: admin
-  # aap_password: changeme
+  vars:
+    aap_validate_certs: false
+    aap_hostname: aap.example.com
+    aap_username: admin
+    aap_password: changeme
   pre_tasks:
     - name: Include vars from platform_configs directory
       ansible.builtin.include_vars:
@@ -126,7 +129,7 @@ controller_license:
   connection: local
   vars:
     aap_validate_certs: false
-    aap_hostname: controller.example.com
+    aap_hostname: aap.example.com
     aap_username: admin
     aap_password: changeme
     redhat_subscription_username: changeme
@@ -142,7 +145,7 @@ controller_license:
 
 ## License
 
-[GPL-3.0](https://github.com/redhat-cop/aap_configuration#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 

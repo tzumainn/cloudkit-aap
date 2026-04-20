@@ -1,11 +1,11 @@
 ---
-- name: Add workflow to Controller
+- name: Bulk launch jobs on Controller
   hosts: localhost
   connection: local
   gather_facts: false
   vars:
     aap_validate_certs: false
-    aap_hostname: controller.example.com
+    aap_hostname: aap.example.com
     aap_username: admin
     aap_password: changeme
 
@@ -16,5 +16,4 @@
         extensions: [yml]
 
   roles:
-    - { role: ../.., when: controller_workflows is defined }
-...
+    - { role: ../.., when: controller_bulk_launch_jobs is defined }

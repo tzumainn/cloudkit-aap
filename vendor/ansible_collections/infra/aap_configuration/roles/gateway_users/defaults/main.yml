@@ -18,15 +18,14 @@ aap_user_accounts: []
 #  - last_name
 #  - email
 #  - is_superuser
+#  - is_platform_auditor
 #  - password
 #  - authenticators
 #  - authenticator_uid
 #  - state
 
-users_default_password: change_me
-
 gateway_users_secure_logging: "{{ aap_configuration_secure_logging | default('false') }}"
-gateway_users_async_retries: "{{ aap_configuration_async_retries | default(30) }}"
+gateway_users_async_retries: "{{ aap_configuration_async_retries | default(50) }}"
 gateway_users_async_delay: "{{ aap_configuration_async_delay | default(1) }}"
 gateway_users_loop_delay: "{{ aap_configuration_loop_delay | default(0) }}"
 aap_configuration_async_dir:

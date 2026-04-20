@@ -1,4 +1,6 @@
 ---
+dispatch_include_wildcard_vars: false
+
 gateway_configuration_dispatcher_roles:
   - role: gateway_authenticators
     var: gateway_authenticators
@@ -15,11 +17,12 @@ gateway_configuration_dispatcher_roles:
     assign_galaxy_credentials_to_org: false
     assign_default_ee_to_org: false
     assign_notification_templates_to_org: false
+    assign_instance_groups_to_org: false
   - role: gateway_applications
     var: aap_applications
     tags: applications
   - role: gateway_http_ports
-    var: http_ports_list
+    var: gateway_http_ports
     tags: http_ports
   - role: gateway_service_clusters
     var: gateway_service_clusters
@@ -39,6 +42,12 @@ gateway_configuration_dispatcher_roles:
   - role: gateway_users
     var: aap_user_accounts
     tags: users
+  - role: gateway_role_definitions
+    var: gateway_role_definitions
+    tags: role_definitions
+  - role: gateway_role_team_assignments
+    var: gateway_role_team_assignments
+    tags: role_team_assignments
   - role: gateway_role_user_assignments
     var: gateway_role_user_assignments
     tags: role_user_assignments
@@ -65,9 +74,6 @@ hub_configuration_dispatcher_roles:
   - role: hub_ee_image
     var: hub_ee_images
     tags: images
-  - role: hub_ee_registry
-    var: hub_ee_registries
-    tags: registry
   - role: hub_ee_registry_index
     var: hub_ee_registries
     tags: ee_indices
@@ -84,6 +90,16 @@ hub_configuration_dispatcher_roles:
     var: hub_collection_repositories
     tags: collectionsrepsync
 
+hub_configuration_dispatcher_roles_publish:
+  - role: hub_publish
+    var: hub_collection_list
+    tags: publish
+  - role: hub_publish
+    var: hub_custom_collections
+    tags: publish
+
+hub_configuration_dispatcher_roles_include_publish: false
+
 controller_configuration_dispatcher_roles:
   - role: controller_settings
     var: controller_settings
@@ -91,9 +107,6 @@ controller_configuration_dispatcher_roles:
   - role: controller_instances
     var: controller_instances
     tags: instances
-  - role: controller_instance_groups
-    var: controller_instance_groups
-    tags: instance_groups
   - role: controller_labels
     var: controller_labels
     tags: labels
@@ -106,6 +119,9 @@ controller_configuration_dispatcher_roles:
   - role: controller_credential_input_sources
     var: controller_credential_input_sources
     tags: credential_input_sources
+  - role: controller_instance_groups
+    var: controller_instance_groups
+    tags: instance_groups
   - role: controller_execution_environments
     var: controller_execution_environments
     tags: execution_environments
@@ -121,6 +137,7 @@ controller_configuration_dispatcher_roles:
     assign_galaxy_credentials_to_org: true
     assign_default_ee_to_org: true
     assign_notification_templates_to_org: true
+    assign_instance_groups_to_org: true
   - role: controller_projects
     var: controller_projects
     tags:
@@ -180,6 +197,9 @@ eda_configuration_dispatcher_roles:
   - role: eda_credentials
     var: eda_credentials
     tags: credential
+  - role: eda_credential_input_sources
+    var: eda_credential_input_sources
+    tags: credential_input_sources
   - role: eda_controller_tokens
     var: eda_controller_tokens
     tags: controller_token
@@ -196,10 +216,15 @@ eda_configuration_dispatcher_roles:
     var: eda_rulebook_activations
     tags: rulebook_activation
 
+aap_configuration_dispatcher_exclude_roles: []
+
 aap_configuration_dispatcher_roles: >
-  {{ gateway_configuration_dispatcher_roles
-   + hub_configuration_dispatcher_roles
-   + controller_configuration_dispatcher_roles
-   + eda_configuration_dispatcher_roles }}
+  {{ (gateway_configuration_dispatcher_roles
+     + hub_configuration_dispatcher_roles
+     + (hub_configuration_dispatcher_roles_publish
+       if hub_configuration_dispatcher_roles_include_publish else [])
+     + controller_configuration_dispatcher_roles
+     + eda_configuration_dispatcher_roles)
+     | rejectattr('role', 'in', aap_configuration_dispatcher_exclude_roles) }}
 
 ...

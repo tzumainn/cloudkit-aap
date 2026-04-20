@@ -4,6 +4,234 @@ infra.aap\_configuration Release Notes
 
 .. contents:: Topics
 
+v4.4.0
+======
+
+Minor Changes
+-------------
+
+- Added controller_role_user_assignments and controller_role_team_assignments to support AAP 2.5 and custom role definitions.
+
+Bugfixes
+--------
+
+- Added tag 'always' to tasks in the dispatch role for include_wildcard_vars to ensure they run regardless of applied tags.
+
+v4.3.0
+======
+
+Minor Changes
+-------------
+
+- Add hub_repository variable to hub_publish role allowing collections to be published to any repository, not just staging.
+- Added the controller_role_definitions role; this allows AAP 2.5 compatibility with creating roles
+
+Bugfixes
+--------
+
+- Fix "argument 'variables' is of type str" error on ansible 2.19+ by avoiding regex_replace on non-string values.
+- Fix EDA credentials failing when inputs is not specified by defaulting to an empty dict when state is present.
+- Fix controller_license argument_specs, re-allow parameters that should be allowed
+- Fix dispatch ordering so credential_types, credentials, and credential_input_sources are processed before instance_groups.
+- Fix gateway_users role sending default password when none specified, causing failures for externally authenticated users.
+- Fix role assignment failing when users/teams are specified as lists in job_templates, inventories, and workflow_job_templates roles blocks.
+- Fixed labels and notification_templates not being applied when defined directly in user data because the Jinja2 expressions checked ``related.*`` (API-exported format) before the direct user value. Reordered the fallback chain to check the direct value first, matching the existing correct pattern used by ``credentials``. Affected roles - controller_job_templates, controller_schedules, controller_workflow_job_templates, controller_projects, controller_inventory_sources, controller_organizations, gateway_organizations (https://github.com/redhat-cop/infra.aap_configuration/issues/1270).
+- Removing enforce defaults for schedules on execution environments because the it causes the api to return an error
+- api endpoint for get_stats playbook was incorrect, fixed to match the correct endpoint for users and subscription info
+
+v4.2.1
+======
+
+Bugfixes
+--------
+
+- Fix incorrectly applied direct roles to projects
+
+v4.2.0
+======
+
+Minor Changes
+-------------
+
+- Add role for creation of EDA credential input sources.
+- Avoid duplicates in hub_configuration_dispatcher_roles and allow including publish roles
+- Correctly set task labels during workflow management
+- Use labels where appropriate in hub_publish
+
+Bugfixes
+--------
+
+- controller_license - Make controller_license role compatible with license module by replacing pool_id parameter with subscription_id.
+- controller_license - remove eula_accepted which has been deprecated and effectively removed by being unusable with this collection for many versions.
+
+v4.1.0
+======
+
+Minor Changes
+-------------
+
+- Allow conditionally preventing object roles to be added to objects directly.
+
+v4.0.0
+======
+
+Major Changes
+-------------
+
+- Added ability to attach roles directly to projects, credentials, inventories, instance groups, workflows and job_templates
+- Adds ability to set a var to register values for each item, or as a whole by setting `aap_configuration_register`.
+
+Minor Changes
+-------------
+
+- Make it possible to exclude roles from the default list in the dispatch role
+- Use just one task to combine wildcard variables in the dispatch role
+
+v3.9.1
+======
+
+Bugfixes
+--------
+
+- Fix wildcard variable handling for gateway_settings
+
+v3.9.0
+======
+
+Minor Changes
+-------------
+
+- added proxy option to eda_projects
+- added the option of project sync to eda_projects
+
+Bugfixes
+--------
+
+- Improve error handling output for collection uploads. Now displays path and namespace.
+
+v3.8.4
+======
+
+Bugfixes
+--------
+
+- Add `kind: constructed` in controller_inventories role document
+- Fix missing wildcard variable tasks for gateway_http_portsgateway_role_definitions, and gateway_role_team_assignments to ensure all variables defined in defaults are properly handled
+- Rename variable to fix conflict between hub_collections variable used in hub_collections and hub_publish roles
+- Updated get_stats playbook to have validate_certs be a var
+- fixing eda roles that were missing aap_token arguments even though it was shown in the arg spec
+- fixing examples for gateway_role_definitions and gateway_role_team_assignments
+
+v3.8.3
+======
+
+Bugfixes
+--------
+
+- Unnecessary gather_facts set to false in configure_aap.yml
+
+v3.8.2
+======
+
+Bugfixes
+--------
+
+- fixing gateway_role_definitions loop_var `__gateway_role_definition_item` to `__gateway_role_definitions_item`
+- fixing role_team_assignments var typo `__gateway_role_team_assignment_item` to `__gateway_role_team_assignments_item`
+
+v3.8.1
+======
+
+Bugfixes
+--------
+
+- Added `gateway_role_definitions` role to dispatch roles
+- Added `gateway_role_team_assignments` role to dispatch roles
+- Updated the async retries default to 50 for the roles to be consistent across the collection.
+
+v3.8.0
+======
+
+Minor Changes
+-------------
+
+- Added `gateway_role_definitions` role for AAP 2.6+
+- Added `gateway_role_team_assignments` role for AAP 2.6+
+- Updated `gateway_role_user_assignments` role these changes will only work in AAP 2.6+
+- added include_wildcard_vars option to dispatch role.
+- updated vars to `hub_` from `ah_` that were missed in hub_publish role
+
+Bugfixes
+--------
+
+- Add enhance async handling to the controller_settings role
+- Added logic to better label the collect_async_status role/tasks to more easily understand where automation is at any given point
+- Fix usage of aap_configuration_collect_logs variable
+- Update role readme files to be consistently worded for the aap_configuration_collect_logs variable
+
+v3.7.0
+======
+
+Minor Changes
+-------------
+
+- Set async log collection default once
+
+Bugfixes
+--------
+
+- fixing `controller_configuration_workflow_async_delay` to what it was supposed to be `controller_configuration_workflow_job_templates_async_delay`
+- fixing `controller_configuration_workflow_async_retries` to what it was supposed to be `controller_configuration_workflow_job_templates_async_retries`
+- fixing `controller_configuration_workflow_loop_delay` to what it was supposed to be `controller_configuration_workflow_job_templates_loop_delay`
+
+v3.6.0
+======
+
+Minor Changes
+-------------
+
+- added a sync option to collection_repository_sync role to allow more easily skipping of specific repositories
+
+Bugfixes
+--------
+
+- changing `workflow_job_templates_secure_logging` to fit standard `controller_configuration_workflow_job_templates_secure_logging`
+- fixing `workflow_job_templates_async_delay` to what it was supposed to be `controller_configuration_workflow_async_delay`
+- fixing `workflow_job_templates_async_retries` to what it was supposed to be controller_configuration_workflow_async_retries`
+
+v3.5.2
+======
+
+Bugfixes
+--------
+
+- fixing bug that got introduced in 3.5.1 causing no_log issues
+
+v3.5.1
+======
+
+Bugfixes
+--------
+
+- Fix accidentally removed usage of '_async_delay' and '_async_retries' variables
+- Fixes issue when adding workflow schemas where the job_id is not defined because a failure state has occurred
+
+v3.5.0
+======
+
+Minor Changes
+-------------
+
+- Add object_ids parameter to gateway_role_user_assignments role
+- Add the ability to collect error logs while configuring the object, instead of failing on the first error.
+- Fix variable name in dispatch role.
+- gateway_role_user_assignments - ansible.platform.role_user_assignment as of version 2.5.20250702 supports the objects_ids parameters and marks object_id as deprecated. pull request
+
+Bugfixes
+--------
+
+- Corrected README for controller_credentials, API URL reference was pointed to AAP 2.4 API not 2.5
+
 v3.4.1
 ======
 
@@ -652,7 +880,7 @@ Major Changes
 Minor Changes
 -------------
 
-- Fixed default filters to use true when neccessary and changed a few defaults to omit rather then a value or empty string.
+- Fixed default filters to use true when necessary and changed a few defaults to omit rather then a value or empty string.
 - updated various Readmes to fix typos and missing information.
 
 Breaking Changes / Porting Guide

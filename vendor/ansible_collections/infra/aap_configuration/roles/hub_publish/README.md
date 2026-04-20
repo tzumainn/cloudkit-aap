@@ -14,17 +14,20 @@ An Ansible Role to publish collections to Automation Hub or Galaxies.
 |`hub_token`|""|no|Admin User's token on the Automation Hub Server.  This should be stored in an Ansible Vault at or elsewhere and called from a parent playbook.||
 |`aap_validate_certs`|`true`|no|Whether or not to validate the Ansible Automation Platform Server's SSL certificate.||
 |`aap_request_timeout`|`10`|no|Specify the timeout Ansible should use in requests to the Galaxy or Automation Hub host.||
+|`aap_configuration_collect_logs`|`false`|no|Specify whether to collect async results and continue for all failed async tasks instead of failing on the first error. Collected results are available in the `aap_configuration_role_errors` variable.||
+|`aap_configuration_register`|""|no|Specify a variable to register the values of all aap_configuration tasks. This will create an object with each aap object as an element containing a list of each item created.||
 |`hub_path_prefix`|""|no|API path used to access the api. Either galaxy, automation-hub, or custom||
 |`aap_configuration_async_dir`|`null`|no|Sets the directory to write the results file for async tasks. The default value is set to `null` which uses the Ansible Default of `/root/.ansible_async/`.||
 |`aap_configuration_working_dir`|`/var/tmp`|no|The working directory where the built artifacts live, or where the artifacts will be built.||
-|`ah_auto_approve`|`false`|no|Whether the collection will be automatically approved in Automation Hub. This will only work if the account being used has correct privileges.||
-|`ah_overwrite_existing`|`false`|no|Whether the collection will be automatically overwrite an existing collection in Automation Hub. This will only work if the account being used has correct privileges.||
-|`hub_collections`|`see below`|no|Data structure describing your collections, mutually exclusive to ah_collection_list, described below.||
-|`ah_collection_list`|`list`|no|Data structure file paths to pre built collections, mutually exclusive with hub_collections.||
+|`hub_auto_approve`|`false`|no|Whether the collection will be automatically approved in Automation Hub. This will only work if the account being used has correct privileges.||
+|`hub_overwrite_existing`|`false`|no|Whether the collection will be automatically overwrite an existing collection in Automation Hub. This will only work if the account being used has correct privileges.||
+|`hub_repository`|`staging`|no|Name of the destination repository to publish collections to. Defaults to `staging`.||
+|`hub_custom_collections`|`see below`|no|Data structure describing your collections, mutually exclusive to hub_collection_list, described below.||
+|`hub_collection_list`|`list`|no|Data structure file paths to pre built collections, mutually exclusive with hub_custom_collections.||
 
 ### Secure Logging Variables
 
-The following Variables compliment each other.
+The following Variables complement each other.
 If Both variables are not set, secure logging defaults to false.
 The role defaults to false as normally the add publish collections task does not include sensitive information.
 hub_configuration_publish_secure_logging defaults to the value of aap_configuration_secure_logging if it is not explicitly called. This allows for secure logging to be toggled for the entire suite of automation hub configuration roles with a single variable, or for the user to selectively use it.
@@ -54,7 +57,7 @@ This also speeds up the overall role.
 
 ## Data Structure
 
-### hub_collections Variables
+### hub_custom_collections Variables
 
 |Variable Name|Default Value|Required|Type|Description|
 |:---:|:---:|:---:|:---:|:---:|
@@ -64,6 +67,7 @@ This also speeds up the overall role.
 |`key_path`|""|no|str|Path to ssh key for authentication.|
 |`ssh_opts`|""|no|str|Options git will pass to ssh when used as protocol.|
 |`collection_local_path`|""|no|str|Path to collection stored locally. Required if git_url not set. This value will be used rather than git_url if set.|
+|`register`|""|no|str|Variable to set based on the result of the object creation/modification|
 
 ### Standard Project Data Structure
 
@@ -71,11 +75,11 @@ This also speeds up the overall role.
 
 ```yaml
 ---
-hub_collections:
+hub_custom_collections:
   - collection_name: cisco.iosxr
     git_url: https://github.com/ansible-collections/cisco.iosxr
 
-ah_auto_approve: true
+hub_auto_approve: true
 ```
 
 ## Playbook Examples
@@ -106,7 +110,7 @@ ah_auto_approve: true
 
 ## License
 
-[GPLv3+](https://github.com/ansible/galaxy_collection#licensing)
+[GPLv3+](https://github.com/redhat-cop/infra.aap_configuration/blob/devel/LICENSE)
 
 ## Author
 
