@@ -8,7 +8,7 @@ controller_projects: # noqa: var-naming[no-role-prefix]
     description: "{{ aap_project_name }}'s project"
     organization: "{{ aap_organization_name }}"
     scm_clean: true
-    scm_update_on_launch: true
+    scm_update_on_launch: false
     scm_credential: ""
     update_project: true
     wait: true
