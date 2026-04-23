@@ -40,7 +40,7 @@
         that:
           - params is defined
           - params.exposed_ports == "22/tcp,80/tcp,443/tcp"
-        fail_msg: "Expected exposed_ports='22/tcp,80/tcp,443/tcp', got {{ params.exposed_ports | default('undefined') }}"
+        fail_msg: "Expected exposed_ports='22/tcp,80/tcp,443/tcp', got {{ (params | default({})).exposed_ports | default('undefined') }}"
 
 - name: Compute Instance Validation - Invalid Pattern Rejection
   hosts: localhost
@@ -56,17 +56,19 @@
     - name: Find ocp_virt_vm role path
       ansible.builtin.set_fact:
         ocp_virt_vm_role_path: "{{ lookup('ansible.builtin.first_found', {'paths': lookup('ansible.builtin.config', 'DEFAULT_ROLES_PATH'), 'patterns': ['osac/templates/roles/ocp_virt_vm']}) | default('') }}"
-      ignore_errors: true
+      failed_when: false
 
     - name: Resolve role path via collection
       ansible.builtin.command:
         cmd: ansible-galaxy collection list osac.templates --format json
       register: collection_info
       changed_when: false
+      when: ocp_virt_vm_role_path | default('') == ''
 
     - name: Set role path from collection info
       ansible.builtin.set_fact:
-        ocp_virt_vm_role_path: "{{ (collection_info.stdout | from_json | dict2items | first).key }}/osac/templates/roles/ocp_virt_vm"
+        ocp_virt_vm_role_path: "{{ (collection_info.stdout | from_json | dict2items | default([{'key': ''}]) | first).key }}/osac/templates/roles/ocp_virt_vm"
+      when: ocp_virt_vm_role_path | default('') == ''
 
     - name: Validate with invalid exposed_ports pattern
       ansible.builtin.set_fact:

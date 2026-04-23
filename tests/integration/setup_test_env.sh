@@ -84,8 +84,11 @@ kubectl create namespace cluster-test-cluster-work || true
 kubectl create namespace computeinstance-test-vm-work || true
 
 # 5. Apply test fixtures
+# Note: computeinstance-defaults-test.yaml is intentionally omitted — it has no required
+# spec fields (tests defaults merging) and is read from file by tests via lookup().
 echo "Applying test fixtures..."
 kubectl apply -f "${SCRIPT_DIR}/fixtures/clusterorder-test.yaml"
 kubectl apply -f "${SCRIPT_DIR}/fixtures/computeinstance-test.yaml"
+kubectl apply -f "${SCRIPT_DIR}/fixtures/computeinstance-with-gpu-test.yaml"
 
 echo "=== Test environment ready ==="

@@ -52,6 +52,11 @@ class AnsibleArgumentSpecEntry(TypedDict):
     options: dict[str, "AnsibleArgumentSpecEntry"]  # Recursive definition
 
 
+# Type hint for reading argument_specs.yaml files
+class AnsibleArgumentSpec(TypedDict):
+    argument_specs: dict[str, AnsibleArgumentSpecEntry]
+
+
 # Type hint for the output of `ansible-galaxy collection list`
 AnsibleCollectionList = dict[str, dict[str, dict[str, str]]]
 
@@ -251,7 +256,7 @@ class TemplateParameterDefinition(Base):
     description: str | None = None
     type: str = "string"
     required: bool = False
-    default: Any = None
+    default: str | int | float | bool | None = None
     validation: ParameterValidation | None = None
 
 
