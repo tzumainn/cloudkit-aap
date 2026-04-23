@@ -12,7 +12,7 @@
 
   - name: Check if the tenant is found
     ansible.builtin.fail:
-      msg: "Tenant namespace was not found. ({{ tenant_target_namespace_tenant.resources | length }} were found.)"
+      msg: "Tenant CR lookup returned {{ tenant_target_namespace_tenant.resources | length }} match(es); exactly 1 was expected."
     when: tenant_target_namespace_tenant.resources | length != 1
 
   - name: Set tenant target namespace as result

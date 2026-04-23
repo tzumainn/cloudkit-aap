@@ -10,7 +10,7 @@
 
 - name: Determine target namespace for VM resources
   ansible.builtin.set_fact:
-    compute_instance_target_namespace: "{{ compute_instance.metadata.annotations['osac.openshift.io/subnet-target-namespace'] | default(tenant_target_namespace) }}"
+    compute_instance_target_namespace: "{{ (compute_instance.metadata.annotations | default({})).get('osac.openshift.io/subnet-target-namespace', tenant_target_namespace) }}"
 
 - name: Log namespace selection
   ansible.builtin.debug:
