@@ -15,7 +15,7 @@
         ansible_eda:
           event:
             payload: "{{ test_compute_instance }}"
-        compute_instance_working_namespace: "computeinstance-test-vm-gpu-work"
+        tenant_target_namespace: "computeinstance-test-vm-gpu-work"
         create_step_resources_override:
           name: osac.workflows.workflow_helpers
           tasks_from: noop.yml
