@@ -7,16 +7,13 @@ export KUBECONFIG="${SCRIPT_DIR}/kubeconfig-osac-test"
 export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
 echo "Using kubeconfig: ${KUBECONFIG}"
 
-# Set Pod environment variables for lease creation (normally set by Kubernetes)
+# Set Pod environment variables for lease creation (normally set by Kubernetes).
+# The placeholder UID ensures leases are garbage-collected between tests
+# (no real pod owns them). The lease role integration test creates its own
+# real pod when it needs a persistent ownerReference.
 export POD_NAMESPACE="osac-system"
 export POD_NAME="test-runner"
-# Use real pod UID if available (created by setup_test_env.sh), fall back to placeholder
-if [ -f "${SCRIPT_DIR}/test-runner-uid" ]; then
-  POD_UID=$(cat "${SCRIPT_DIR}/test-runner-uid")
-  export POD_UID
-else
-  export POD_UID="00000000-0000-0000-0000-000000000000"
-fi
+export POD_UID="00000000-0000-0000-0000-000000000000"
 
 # Suppress inventory parsing warnings
 export ANSIBLE_INVENTORY_UNPARSED_WARNING=False
