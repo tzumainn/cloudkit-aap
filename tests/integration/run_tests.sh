@@ -98,6 +98,21 @@ done
 echo "=== Running Role Integration Tests ==="
 echo ""
 
+# Create a real pod for lease ownerReference tests (prevents K8s GC).
+# Scoped to role tests only -- workflow tests use the placeholder UID
+# so leases get GC'd between baseline and override runs.
+echo "Creating test-runner pod for lease role tests..."
+kubectl run lease-test-pod --image=registry.k8s.io/pause:3.9 --restart=Never -n osac-system 2>/dev/null || true
+kubectl wait --for=condition=Ready pod/lease-test-pod -n osac-system --timeout=60s 2>/dev/null || true
+LEASE_POD_UID=$(kubectl get pod lease-test-pod -n osac-system -o jsonpath='{.metadata.uid}' 2>/dev/null || echo "")
+if [ -n "${LEASE_POD_UID}" ]; then
+  export POD_NAME="lease-test-pod"
+  export POD_UID="${LEASE_POD_UID}"
+  echo "Lease test pod ready (UID: ${POD_UID})"
+else
+  echo "WARNING: could not create lease test pod; lease tests may fail"
+fi
+
 for role in "${ROLE_TESTS[@]}"; do
   echo "----------------------------------------"
   echo "Testing role: $role"
@@ -131,6 +146,9 @@ for entry in "${ROLE_SCENARIO_TESTS[@]}"; do
 
   echo ""
 done
+
+# Clean up lease test pod
+kubectl delete pod lease-test-pod -n osac-system --ignore-not-found 2>/dev/null || true
 
 echo "========================================"
 echo "Test Results"
