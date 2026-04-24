@@ -105,6 +105,11 @@
   until: metallb_ingress_l2advertisement is successful
   retries: 60
   delay: 10
+  when: worker_bgp_params is not defined
+
+- name: Configure BGP
+  ansible.builtin.include_tasks: configure_bgp.yml
+  when: worker_bgp_params is defined
 
 - name: Create metallb ingress service
   kubernetes.core.k8s:

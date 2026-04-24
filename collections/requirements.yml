@@ -22,3 +22,7 @@ collections:
   - name: osac.massopencloud
     type: git
     source: https://github.com/osac-project/osac-massopencloud-templates
+  - name: nvidia.bare_metal
+    type: git
+    source: https://github.com/fabiendupont/nvidia-ncx-infra-controller-ansible
+    version: 1.3.0
