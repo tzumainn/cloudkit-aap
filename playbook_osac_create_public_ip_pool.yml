@@ -6,21 +6,13 @@
   vars:
     public_ip_pool: "{{ ansible_eda.event.payload }}"
     public_ip_pool_name: "{{ ansible_eda.event.payload.metadata.name }}"
-    # Implementation strategy set by osac-operator from PublicIPPool spec
-    implementation_strategy: >-
-      {{ (ansible_eda.event.payload.metadata.annotations | default({}))
-         .get('osac.openshift.io/implementation-strategy', '') }}
+    implementation_strategy: "{{ ansible_eda.event.payload.spec.implementationStrategy }}"
     template_parameters: {}
 
   pre_tasks:
     - name: Show EDA Event
       ansible.builtin.debug:
         var: ansible_eda.event.payload
-
-    - name: Validate implementation strategy is set
-      ansible.builtin.fail:
-        msg: "Missing required annotation 'osac.openshift.io/implementation-strategy'"
-      when: implementation_strategy | length == 0
 
   tasks:
     - name: Display PublicIPPool information
