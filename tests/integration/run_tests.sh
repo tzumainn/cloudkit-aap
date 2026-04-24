@@ -36,12 +36,22 @@ WORKFLOWS=(
   "cluster_status_reporting"
 )
 
-# Role-level integration tests (baseline only, no overrides)
+# Role-level integration tests.
+# Roles with a single baseline.yml are listed in ROLE_TESTS.
+# Roles with multiple scenarios (due to set_fact persistence across plays)
+# list each scenario file separately in ROLE_SCENARIO_TESTS.
 ROLE_TESTS=(
   "finalizer"
   "lease"
-  "cluster_working_namespace"
-  "compute_instance_working_namespace"
+)
+
+ROLE_SCENARIO_TESTS=(
+  "cluster_working_namespace:test_not_found"
+  "cluster_working_namespace:test_predefined"
+  "cluster_working_namespace:test_found"
+  "compute_instance_working_namespace:test_not_found"
+  "compute_instance_working_namespace:test_predefined"
+  "compute_instance_working_namespace:test_found"
 )
 
 echo "=== Running Workflow Integration Tests ==="
@@ -102,6 +112,24 @@ for role in "${ROLE_TESTS[@]}"; do
   else
     echo "  ✗ Failed"
     FAILED+=("$role:baseline")
+  fi
+
+  echo ""
+done
+
+for entry in "${ROLE_SCENARIO_TESTS[@]}"; do
+  role="${entry%%:*}"
+  scenario="${entry##*:}"
+  echo "----------------------------------------"
+  echo "Testing role: $role ($scenario)"
+  echo "----------------------------------------"
+
+  if ansible-playbook "targets/${role}/tasks/${scenario}.yml" -e "@common_vars.yml" -v; then
+    echo "  ✓ Passed"
+    PASSED+=("$role:$scenario")
+  else
+    echo "  ✗ Failed"
+    FAILED+=("$role:$scenario")
   fi
 
   echo ""
