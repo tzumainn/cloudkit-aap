@@ -55,6 +55,10 @@
   tasks:
     - name: Run not-found failure test
       block:
+        - name: Reset fact from previous play
+          ansible.builtin.set_fact:
+            cluster_working_namespace: null
+
         - name: Run role with nonexistent order name
           ansible.builtin.include_role:
             name: osac.service.cluster_working_namespace
@@ -69,7 +73,7 @@
         - name: Verify role failed with expected message
           ansible.builtin.assert:
             that:
-              - "'not found' in ansible_failed_result.msg"
+              - "'Working cluster namespace was not found' in ansible_failed_result.msg"
             fail_msg: "Role failed but with unexpected message: {{ ansible_failed_result.msg }}"
             success_msg: "Not found failure: passed"
 

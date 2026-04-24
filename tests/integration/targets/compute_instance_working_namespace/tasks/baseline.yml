@@ -69,6 +69,10 @@
   tasks:
     - name: Run not-found failure test
       block:
+        - name: Reset fact from previous play
+          ansible.builtin.set_fact:
+            compute_instance_working_namespace: null
+
         - name: Run role with nonexistent tenant reference
           ansible.builtin.include_role:
             name: osac.service.compute_instance_working_namespace
@@ -87,7 +91,7 @@
         - name: Verify role failed with expected message
           ansible.builtin.assert:
             that:
-              - "'not found' in ansible_failed_result.msg"
+              - "'Tenant namespace was not found' in ansible_failed_result.msg"
             fail_msg: "Role failed but with unexpected message: {{ ansible_failed_result.msg }}"
             success_msg: "Tenant not found failure: passed"
 

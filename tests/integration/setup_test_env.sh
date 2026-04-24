@@ -89,13 +89,21 @@ kubectl apply -f "${SCRIPT_DIR}/fixtures/"
 
 # 6. Create test-runner pod for lease ownerReference tests
 echo "Creating test-runner pod for lease tests..."
-kubectl run test-runner --image=registry.k8s.io/pause:3.9 --restart=Never -n osac-system 2>/dev/null || true
+if ! kubectl get pod test-runner -n osac-system >/dev/null 2>&1; then
+  kubectl run test-runner --image=registry.k8s.io/pause:3.9 --restart=Never -n osac-system
+fi
 echo "Waiting for test-runner pod..."
-kubectl wait --for=condition=Ready pod/test-runner -n osac-system --timeout=60s 2>/dev/null || echo "Pod not ready yet (may still work for ownerReference)"
+kubectl wait --for=condition=Ready pod/test-runner -n osac-system --timeout=60s \
+  || echo "WARNING: test-runner pod not Ready; lease ownerReference tests may not work"
 
 # Export real pod UID for lease tests (run_tests.sh reads this)
-TEST_RUNNER_UID=$(kubectl get pod test-runner -n osac-system -o jsonpath='{.metadata.uid}' 2>/dev/null || echo "00000000-0000-0000-0000-000000000000")
-echo "Test runner pod UID: ${TEST_RUNNER_UID}"
+if TEST_RUNNER_UID=$(kubectl get pod test-runner -n osac-system -o jsonpath='{.metadata.uid}' 2>/dev/null) \
+   && [ -n "${TEST_RUNNER_UID}" ]; then
+  echo "Test runner pod UID: ${TEST_RUNNER_UID}"
+else
+  TEST_RUNNER_UID="00000000-0000-0000-0000-000000000000"
+  echo "WARNING: could not resolve test-runner UID; falling back to ${TEST_RUNNER_UID}"
+fi
 echo "${TEST_RUNNER_UID}" > "${SCRIPT_DIR}/test-runner-uid"
 
 echo "=== Test environment ready ==="

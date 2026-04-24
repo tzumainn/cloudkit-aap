@@ -12,7 +12,8 @@ export POD_NAMESPACE="osac-system"
 export POD_NAME="test-runner"
 # Use real pod UID if available (created by setup_test_env.sh), fall back to placeholder
 if [ -f "${SCRIPT_DIR}/test-runner-uid" ]; then
-  export POD_UID=$(cat "${SCRIPT_DIR}/test-runner-uid")
+  POD_UID=$(cat "${SCRIPT_DIR}/test-runner-uid")
+  export POD_UID
 else
   export POD_UID="00000000-0000-0000-0000-000000000000"
 fi
