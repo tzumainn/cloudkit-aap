@@ -40,6 +40,16 @@ jobs:
                                             --tag "osac-ee"         \
                                             -f "./execution-environment/execution-environment.yaml"
 
+      - name: Extract metadata (tags, labels)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha
+            type=raw,value=latest
+
       - name: Log against GHCR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
@@ -48,12 +58,7 @@ jobs:
       - name: Push execution environment image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          IMAGE_NAME="ghcr.io/${{ github.repository }}"
-          IMAGE_NAME_LATEST="${IMAGE_NAME}:latest"
-          IMAGE_NAME_SHA="${IMAGE_NAME}:${{ github.sha }}"
-
-          podman tag "osac-ee" "${IMAGE_NAME_LATEST}"
-          podman tag "osac-ee" "${IMAGE_NAME_SHA}"
-
-          podman push "${IMAGE_NAME_LATEST}"
-          podman push "${IMAGE_NAME_SHA}"
+          for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr '\n' ' '); do
+            podman tag "osac-ee" "${tag}"
+            podman push "${tag}"
+          done
