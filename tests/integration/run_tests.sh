@@ -7,7 +7,10 @@ export KUBECONFIG="${SCRIPT_DIR}/kubeconfig-osac-test"
 export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
 echo "Using kubeconfig: ${KUBECONFIG}"
 
-# Set Pod environment variables for lease creation (normally set by Kubernetes)
+# Set Pod environment variables for lease creation (normally set by Kubernetes).
+# The placeholder UID ensures leases are garbage-collected between tests
+# (no real pod owns them). The lease role integration test creates its own
+# real pod when it needs a persistent ownerReference.
 export POD_NAMESPACE="osac-system"
 export POD_NAME="test-runner"
 export POD_UID="00000000-0000-0000-0000-000000000000"
@@ -30,7 +33,25 @@ WORKFLOWS=(
   "cluster_status_reporting"
 )
 
-echo "=== Running Integration Tests ==="
+# Role-level integration tests.
+# Roles with a single baseline.yml are listed in ROLE_TESTS.
+# Roles with multiple scenarios (due to set_fact persistence across plays)
+# list each scenario file separately in ROLE_SCENARIO_TESTS.
+ROLE_TESTS=(
+  "finalizer"
+  "lease"
+)
+
+ROLE_SCENARIO_TESTS=(
+  "cluster_working_namespace:test_not_found"
+  "cluster_working_namespace:test_predefined"
+  "cluster_working_namespace:test_found"
+  "compute_instance_working_namespace:test_not_found"
+  "compute_instance_working_namespace:test_predefined"
+  "compute_instance_working_namespace:test_found"
+)
+
+echo "=== Running Workflow Integration Tests ==="
 echo ""
 
 for workflow in "${WORKFLOWS[@]}"; do
@@ -73,6 +94,61 @@ for workflow in "${WORKFLOWS[@]}"; do
 
   echo ""
 done
+
+echo "=== Running Role Integration Tests ==="
+echo ""
+
+# Create a real pod for lease ownerReference tests (prevents K8s GC).
+# Scoped to role tests only -- workflow tests use the placeholder UID
+# so leases get GC'd between baseline and override runs.
+echo "Creating test-runner pod for lease role tests..."
+kubectl run lease-test-pod --image=registry.k8s.io/pause:3.9 --restart=Never -n osac-system 2>/dev/null || true
+kubectl wait --for=condition=Ready pod/lease-test-pod -n osac-system --timeout=60s 2>/dev/null || true
+LEASE_POD_UID=$(kubectl get pod lease-test-pod -n osac-system -o jsonpath='{.metadata.uid}' 2>/dev/null || echo "")
+if [ -n "${LEASE_POD_UID}" ]; then
+  export POD_NAME="lease-test-pod"
+  export POD_UID="${LEASE_POD_UID}"
+  echo "Lease test pod ready (UID: ${POD_UID})"
+else
+  echo "WARNING: could not create lease test pod; lease tests may fail"
+fi
+
+for role in "${ROLE_TESTS[@]}"; do
+  echo "----------------------------------------"
+  echo "Testing role: $role"
+  echo "----------------------------------------"
+
+  if ansible-playbook "targets/${role}/tasks/baseline.yml" -e "@common_vars.yml" -v; then
+    echo "  ✓ Passed"
+    PASSED+=("$role:baseline")
+  else
+    echo "  ✗ Failed"
+    FAILED+=("$role:baseline")
+  fi
+
+  echo ""
+done
+
+for entry in "${ROLE_SCENARIO_TESTS[@]}"; do
+  role="${entry%%:*}"
+  scenario="${entry##*:}"
+  echo "----------------------------------------"
+  echo "Testing role: $role ($scenario)"
+  echo "----------------------------------------"
+
+  if ansible-playbook "targets/${role}/tasks/${scenario}.yml" -e "@common_vars.yml" -v; then
+    echo "  ✓ Passed"
+    PASSED+=("$role:$scenario")
+  else
+    echo "  ✗ Failed"
+    FAILED+=("$role:$scenario")
+  fi
+
+  echo ""
+done
+
+# Clean up lease test pod
+kubectl delete pod lease-test-pod -n osac-system --ignore-not-found 2>/dev/null || true
 
 echo "========================================"
 echo "Test Results"
