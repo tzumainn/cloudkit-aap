@@ -1,18 +1,18 @@
 ---
-- name: "ComputeInstanceWorkingNamespace - Test pre-defined preserved"
+- name: "TenantTargetNamespace - Test pre-defined preserved"
   hosts: localhost
   gather_facts: false
   vars_files:
     - ../../../common_vars.yml
 
   tasks:
-    - name: Pre-define compute_instance_working_namespace
+    - name: Pre-define tenant_target_namespace
       ansible.builtin.set_fact:
-        compute_instance_working_namespace: "my-custom-vm-namespace"
+        tenant_target_namespace: "my-custom-vm-namespace"
 
     - name: Run role (should skip lookup)
       ansible.builtin.include_role:
-        name: osac.service.compute_instance_working_namespace
+        name: osac.service.tenant_target_namespace
       vars:
         compute_instance:
           status:
@@ -23,6 +23,6 @@
     - name: Verify pre-defined value preserved
       ansible.builtin.assert:
         that:
-          - compute_instance_working_namespace == "my-custom-vm-namespace"
+          - tenant_target_namespace == "my-custom-vm-namespace"
         fail_msg: "Pre-defined namespace was overwritten"
         success_msg: "Pre-defined preserved: passed"

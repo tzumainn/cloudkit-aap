@@ -1,5 +1,5 @@
 ---
-- name: "ComputeInstanceWorkingNamespace - Test tenant not found (should fail)"
+- name: "TenantTargetNamespace - Test tenant not found (should fail)"
   hosts: localhost
   gather_facts: false
   vars_files:
@@ -10,7 +10,7 @@
       block:
         - name: Run role with nonexistent tenant reference
           ansible.builtin.include_role:
-            name: osac.service.compute_instance_working_namespace
+            name: osac.service.tenant_target_namespace
           vars:
             compute_instance:
               status:
@@ -26,6 +26,6 @@
         - name: Verify role failed with expected message
           ansible.builtin.assert:
             that:
-              - "'Tenant namespace was not found' in ansible_failed_result.msg"
+              - "'exactly 1 was expected' in ansible_failed_result.msg"
             fail_msg: "Role failed but with unexpected message: {{ ansible_failed_result.msg }}"
             success_msg: "Tenant not found failure: passed"
