@@ -1,0 +1,25 @@
+---
+# Create Neutron subnet
+
+- name: Extract Subnet configuration
+  ansible.builtin.set_fact:
+    sn_name: "{{ subnet.metadata.name }}"
+    sn_ipv4_cidr: "{{ subnet.spec.ipv4Cidr | default(default_subnet_ipv4_cidr) }}"
+    sn_virtual_network: "{{ subnet.spec.virtualNetwork }}"
+
+- name: Create subnet
+  openstack.cloud.subnet:
+    name: "{{ sn_name }}"
+    network: "{{ sn_virtual_network }}"
+    cidr: "{{ sn_ipv4_cidr }}"
+    dns_nameservers: "{{ default_subnet_dns_nameservers }}"
+    gateway_ip: "{{ default_subnet_gateway_ip }}"
+    allocation_pool_start: "{{ default_subnet_allocation_pool_start }}"
+    allocation_pool_end: "{{ default_subnet_allocation_pool_end }}"
+  register: subnet_result
+
+- name: Display OpenStack subnet creation result
+  ansible.builtin.debug:
+    msg:
+      - "OpenStack subnet '{{ sn_name }}' created successfully"
+      - "Resource UID: {{ subnet_result.id }}"
