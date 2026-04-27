@@ -126,12 +126,47 @@ validation, and lifecycle management.
 4. Implement provisioning tasks in `roles/my_cluster_template/tasks/install.yaml`
 5. Implement cleanup tasks in `roles/my_cluster_template/tasks/delete.yaml`
 
-### Creating a New VM Template
+### Creating a New ComputeInstance Template
 
-1. Create role structure as above
-2. Set `template_type: vm` in `meta/osac.yaml`
-3. Use `create.yaml` and `delete.yaml` instead of `install.yaml`
-4. Implement VM creation using `kubernetes.core.k8s` modules
+ComputeInstance templates define all metadata, spec defaults, and parameters in a
+single file: `meta/osac.yaml`.
+
+1. Create a new role directory under `roles/`:
+   ```bash
+   mkdir -p roles/my_vm_template/{tasks,meta}
+   ```
+
+2. Define template metadata, spec defaults, and parameters in `roles/my_vm_template/meta/osac.yaml`:
+   ```yaml
+   title: My VM Template
+   description: Description of what this template provides
+   template_type: compute_instance
+
+   spec_defaults:
+     cores: 2
+     memory_gib: 2
+     boot_disk:
+       size_gib: 10
+     image:
+       source_type: registry
+       source_ref: "quay.io/containerdisks/fedora:latest"
+     run_strategy: "Always"
+
+   parameters:
+     - name: my_param
+       title: My Parameter
+       description: What this parameter controls
+       type: string
+       required: false
+       default: "some_default"
+       validation:
+         pattern: '^[a-z]+$'
+   ```
+
+3. Implement provisioning tasks in `roles/my_vm_template/tasks/create.yaml`
+4. Implement cleanup tasks in `roles/my_vm_template/tasks/delete.yaml`
+
+See `roles/ocp_virt_vm` for a complete example.
 
 ## Architecture
 
@@ -167,7 +202,7 @@ Templates integrate with OSAC through a well-defined interface:
 
 Contributions are welcome! Please ensure all templates:
 - Include comprehensive `meta/osac.yaml` metadata
-- Define all parameters in `meta/argument_specs.yaml`
+- Define parameters in `meta/osac.yaml` (ComputeInstance templates) or `meta/argument_specs.yaml` (cluster templates)
 - Implement both create and delete operations
 - Follow Ansible best practices
 - Include descriptive variable names and comments

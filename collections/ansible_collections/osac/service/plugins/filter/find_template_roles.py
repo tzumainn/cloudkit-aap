@@ -196,7 +196,7 @@ class ComputeInstanceImage(Base):
     """Image configuration for compute instance spec defaults."""
 
     source_type: str = pydantic.Field(
-        ...,
+        default="registry",
         validation_alias=pydantic.AliasChoices("sourceType", "source_type"),
         serialization_alias="source_type",
     )
