@@ -5,41 +5,23 @@
   vars_files:
     - ../../../common_vars.yml
 
+  collections:
+    - osac.templates
+
   tasks:
     - name: Read minimal ComputeInstance fixture (no spec fields)
       ansible.builtin.set_fact:
-        test_compute_instance: "{{ lookup('file', '../../../fixtures/computeinstance-defaults-test.yaml') | from_yaml }}"
+        compute_instance: "{{ lookup('file', '../../../fixtures/computeinstance-defaults-test.yaml') | from_yaml }}"
 
-    - name: Set test variables for defaults workflow
-      ansible.builtin.set_fact:
-        ansible_eda:
-          event:
-            payload: "{{ test_compute_instance }}"
-        compute_instance_working_namespace: "computeinstance-test-vm-work"
-        # Override resource creation to prevent actual VM/DataVolume creation
-        create_step_resources_override:
-          name: osac.workflows.workflow_helpers
-          tasks_from: noop.yml
-        # Override wait/annotate since there's no VM to wait for
-        create_step_wait_annotate_override:
-          name: osac.workflows.workflow_helpers
-          tasks_from: noop.yml
+    - name: Run create_validate to merge defaults and extract VM config
+      ansible.builtin.include_role:
+        name: osac.templates.ocp_virt_vm
+        tasks_from: create_validate.yaml
 
-- name: Import compute instance create workflow (defaults test)
-  ansible.builtin.import_playbook: osac.workflows.compute_instance.create
-
-- name: Verify default spec values applied
-  hosts: localhost
-  gather_facts: false
-  vars_files:
-    - ../../../common_vars.yml
-
-  tasks:
-    - name: Verify compute instance name extracted
+    - name: Verify compute instance name
       ansible.builtin.assert:
         that:
-          - compute_instance_name is defined
-          - compute_instance_name == "test-vm-defaults"
+          - compute_instance.metadata.name == "test-vm-defaults"
         fail_msg: "Compute instance name not extracted correctly"
 
     - name: Verify default CPU cores applied

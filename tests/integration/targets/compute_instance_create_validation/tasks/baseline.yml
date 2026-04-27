@@ -5,36 +5,24 @@
   vars_files:
     - ../../../common_vars.yml
 
+  collections:
+    - osac.templates
+
   tasks:
     - name: Read minimal ComputeInstance fixture
       ansible.builtin.set_fact:
-        test_compute_instance: "{{ lookup('file', '../../../fixtures/computeinstance-defaults-test.yaml') | from_yaml }}"
+        compute_instance: "{{ lookup('file', '../../../fixtures/computeinstance-defaults-test.yaml') | from_yaml }}"
 
-    - name: Set test variables with valid template_parameters
+    - name: Set template parameters with valid exposed_ports
       ansible.builtin.set_fact:
-        ansible_eda:
-          event:
-            payload: "{{ test_compute_instance }}"
-        compute_instance_working_namespace: "computeinstance-test-vm-work"
         template_parameters:
           exposed_ports: "22/tcp,80/tcp,443/tcp"
-        create_step_resources_override:
-          name: osac.workflows.workflow_helpers
-          tasks_from: noop.yml
-        create_step_wait_annotate_override:
-          name: osac.workflows.workflow_helpers
-          tasks_from: noop.yml
 
-- name: Import compute instance create workflow (valid params)
-  ansible.builtin.import_playbook: osac.workflows.compute_instance.create
+    - name: Run create_validate to merge defaults and validate params
+      ansible.builtin.include_role:
+        name: osac.templates.ocp_virt_vm
+        tasks_from: create_validate.yaml
 
-- name: Verify valid parameters accepted
-  hosts: localhost
-  gather_facts: false
-  vars_files:
-    - ../../../common_vars.yml
-
-  tasks:
     - name: Verify custom exposed_ports value applied
       ansible.builtin.assert:
         that:
@@ -48,27 +36,13 @@
   vars_files:
     - ../../../common_vars.yml
 
+  collections:
+    - osac.templates
+
   tasks:
-    - name: Read minimal ComputeInstance fixture
+    - name: Set role path from collection
       ansible.builtin.set_fact:
-        test_compute_instance: "{{ lookup('file', '../../../fixtures/computeinstance-defaults-test.yaml') | from_yaml }}"
-
-    - name: Find ocp_virt_vm role path
-      ansible.builtin.set_fact:
-        ocp_virt_vm_role_path: "{{ lookup('ansible.builtin.first_found', {'paths': lookup('ansible.builtin.config', 'DEFAULT_ROLES_PATH'), 'patterns': ['osac/templates/roles/ocp_virt_vm']}) | default('') }}"
-      failed_when: false
-
-    - name: Resolve role path via collection
-      ansible.builtin.command:
-        cmd: ansible-galaxy collection list osac.templates --format json
-      register: collection_info
-      changed_when: false
-      when: ocp_virt_vm_role_path | default('') == ''
-
-    - name: Set role path from collection info
-      ansible.builtin.set_fact:
-        ocp_virt_vm_role_path: "{{ (collection_info.stdout | from_json | dict2items | default([{'key': ''}]) | first).key }}/osac/templates/roles/ocp_virt_vm"
-      when: ocp_virt_vm_role_path | default('') == ''
+        ocp_virt_vm_role_path: "{{ lookup('ansible.builtin.first_found', paths=lookup('ansible.builtin.config', 'COLLECTIONS_PATHS') | map('regex_replace', '$', '/ansible_collections/osac/templates/roles/ocp_virt_vm/meta') | list, files=['osac.yaml']) | dirname | dirname }}"
 
     - name: Validate with invalid exposed_ports pattern
       ansible.builtin.set_fact:
