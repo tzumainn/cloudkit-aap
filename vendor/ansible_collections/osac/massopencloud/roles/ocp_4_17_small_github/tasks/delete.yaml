@@ -7,7 +7,7 @@
     api_version: v1
     kind: Service
     name: "{{ compute_instance_name }}-service"
-    namespace: "{{ tenant_target_namespace }}"
+    namespace: "{{ compute_instance_working_namespace }}"
     state: absent
 
 - name: Delete VM load balancer service
@@ -15,5 +15,5 @@
     api_version: v1
     kind: Service
     name: "{{ compute_instance_name }}-load-balancer"
-    namespace: "{{ tenant_target_namespace }}"
+    namespace: "{{ compute_instance_working_namespace }}"
     state: absent

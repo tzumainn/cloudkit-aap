@@ -34,7 +34,7 @@
       kind: Service
       metadata:
         name: "{{ compute_instance_name }}-load-balancer"
-        namespace: "{{ tenant_target_namespace }}"
+        namespace: "{{ compute_instance_working_namespace }}"
         labels: "{{ default_vm_labels }}"
       spec:
         type: LoadBalancer
@@ -46,7 +46,7 @@
     api_version: v1
     kind: Service
     name: "{{ compute_instance_name }}-load-balancer"
-    namespace: "{{ tenant_target_namespace }}"
+    namespace: "{{ compute_instance_working_namespace }}"
   register: load_balancer
   until: load_balancer.resources[0].status.loadBalancer.ingress is defined
   retries: 30
@@ -57,7 +57,7 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachineInstance
     name: "{{ compute_instance_name }}"
-    namespace: "{{ tenant_target_namespace }}"
+    namespace: "{{ compute_instance_working_namespace }}"
   register: vmi_info
 
 - name: Get Node information for the VM
