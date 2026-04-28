@@ -55,3 +55,10 @@
           - template_id is defined
           - template_id == "osac.templates.ocp_virt_vm"
         fail_msg: "Template ID not extracted correctly"
+
+    - name: Verify user-specified spec values override template defaults
+      ansible.builtin.assert:
+        that:
+          - vm_memory == "4Gi"
+          - vm_boot_disk_size == "20Gi"
+        fail_msg: "User spec values should override template defaults."

@@ -1,0 +1,10 @@
+---
+apiVersion: osac.openshift.io/v1alpha1
+kind: ComputeInstance
+metadata:
+  name: test-vm-defaults
+  namespace: osac-system
+spec:
+  templateID: osac.templates.ocp_virt_vm
+status:
+  desiredConfigVersion: "1"

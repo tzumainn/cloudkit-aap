@@ -2,17 +2,3 @@
 default_vm_internal_network: "hypershift"
 default_vm_storage_class: "nfs-client"
 default_vm_labels: "{{ {compute_instance_label: compute_instance_name} }}"
-
-# Setup the defaults described in the arg_specs.
-default_arg_specs:
-  exposed_ports: "22/tcp"
-
-# Defaults for ComputeInstance spec fields.
-default_spec:
-  cores: 2
-  memoryGiB: 2
-  bootDisk:
-    sizeGiB: 10
-  image:
-    sourceRef: "quay.io/containerdisks/fedora:latest"
-  runStrategy: "Always"

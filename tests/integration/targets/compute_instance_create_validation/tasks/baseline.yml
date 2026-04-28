@@ -1,0 +1,58 @@
+---
+- name: Compute Instance Validation - Valid Parameters Test
+  hosts: localhost
+  gather_facts: true
+  vars_files:
+    - ../../../common_vars.yml
+
+  collections:
+    - osac.templates
+
+  tasks:
+    - name: Read minimal ComputeInstance fixture
+      ansible.builtin.set_fact:
+        compute_instance: "{{ lookup('file', '../../../fixtures/computeinstance-defaults-test.yaml') | from_yaml }}"
+
+    - name: Set template parameters with valid exposed_ports
+      ansible.builtin.set_fact:
+        template_parameters:
+          exposed_ports: "22/tcp,80/tcp,443/tcp"
+
+    - name: Run create_validate to merge defaults and validate params
+      ansible.builtin.include_role:
+        name: osac.templates.ocp_virt_vm
+        tasks_from: create_validate.yaml
+
+    - name: Verify custom exposed_ports value applied
+      ansible.builtin.assert:
+        that:
+          - params is defined
+          - params.exposed_ports == "22/tcp,80/tcp,443/tcp"
+        fail_msg: "Expected exposed_ports='22/tcp,80/tcp,443/tcp', got {{ (params | default({})).exposed_ports | default('undefined') }}"
+
+- name: Compute Instance Validation - Invalid Pattern Rejection
+  hosts: localhost
+  gather_facts: true
+  vars_files:
+    - ../../../common_vars.yml
+
+  collections:
+    - osac.templates
+
+  tasks:
+    - name: Set role path from collection
+      ansible.builtin.set_fact:
+        ocp_virt_vm_role_path: "{{ lookup('ansible.builtin.first_found', paths=lookup('ansible.builtin.config', 'COLLECTIONS_PATHS') | map('regex_replace', '$', '/ansible_collections/osac/templates/roles/ocp_virt_vm/meta') | list, files=['osac.yaml']) | dirname | dirname }}"
+
+    - name: Validate with invalid exposed_ports pattern
+      ansible.builtin.set_fact:
+        invalid_result: "{{ {'exposed_ports': 'not-a-valid-port'} | osac.templates.template_validate_params(ocp_virt_vm_role_path) }}"
+      register: validation_result
+      ignore_errors: true
+
+    - name: Verify validation rejected invalid pattern
+      ansible.builtin.assert:
+        that:
+          - validation_result is failed
+          - "'does not match pattern' in validation_result.msg"
+        fail_msg: "Expected validation to reject 'not-a-valid-port' but it {{ 'passed' if validation_result is success else 'failed with: ' + (validation_result.msg | default('unknown error')) }}"

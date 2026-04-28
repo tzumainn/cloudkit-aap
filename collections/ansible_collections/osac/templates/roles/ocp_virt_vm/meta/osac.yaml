@@ -5,3 +5,27 @@ description: >
 
 # Specify this is a ComputeInstance template (not a cluster template)
 template_type: compute_instance
+
+spec_defaults:
+  cores: 2
+  memory_gib: 2
+  boot_disk:
+    size_gib: 10
+  image:
+    source_type: registry
+    source_ref: "quay.io/containerdisks/fedora:latest"
+  run_strategy: "Always"
+
+parameters:
+  - name: exposed_ports
+    title: Exposed Ports
+    description: >
+      Ports to expose on the VM for ingress traffic.
+      The syntax is a comma-separated list of `<port>/<protocol>` pairs,
+      where `<protocol>` is either `tcp` or `udp`.
+      For example, `22/tcp,80/tcp` will expose tcp ports 22 and 80 on the VM.
+    type: string
+    required: false
+    default: "22/tcp"
+    validation:
+      pattern: '^([0-9]+/(tcp|udp))(,[0-9]+/(tcp|udp))*$'
