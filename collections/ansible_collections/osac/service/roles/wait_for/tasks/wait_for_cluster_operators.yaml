@@ -12,10 +12,10 @@
     kubeconfig: "{{ wait_for_kubeconfig }}"
   register: _wait_co_results
   until: >-
-    _wait_co_results.resources | default([]) | length > 0
-    and _wait_co_results.resources
+    (_wait_co_results.resources | default([]) | length > 0)
+    and (_wait_co_results.resources
         | json_query("[?!(status.conditions[?type=='Available' && status=='True'])]")
-        | length == 0
+        | length == 0)
   retries: "{{ wait_for_clusteroperators_retries }}"
   delay: "{{ wait_for_clusteroperators_delay }}"
 

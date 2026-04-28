@@ -9,16 +9,14 @@
     - "{{ external_access_name }}-ingress"
 
 - name: Delete dns records
-  amazon.aws.route53:
-    state: absent
-    zone: "{{ external_access_base_domain }}"
-    record: "{{ item }}"
-    type: A
-    wait: true
-  environment:
-    AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') | trim }}"
-    AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') | trim }}"
+  ansible.builtin.include_role:
+    name: dns.api.dns
+    tasks_from: delete
+  vars:
+    dns_zone: "{{ external_access_base_domain }}"
+    dns_record_name: "{{ item }}"
+    dns_record_type: A
   loop:
-  - "api.{{ external_access_name }}.{{ external_access_base_domain }}"
-  - "api-int.{{ external_access_name }}.{{ external_access_base_domain }}"
-  - "*.apps.{{ external_access_name }}.{{ external_access_base_domain }}"
+    - "api.{{ external_access_name }}.{{ external_access_base_domain }}"
+    - "api-int.{{ external_access_name }}.{{ external_access_base_domain }}"
+    - "*.apps.{{ external_access_name }}.{{ external_access_base_domain }}"

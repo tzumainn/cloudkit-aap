@@ -13,8 +13,8 @@
     name: kube-apiserver
   register: kube_apiserver_service
   until: >-
-    kube_apiserver_service.resources and
-    kube_apiserver_service.resources[0].status.loadBalancer.ingress | default(false)
+    (kube_apiserver_service.resources | length > 0) and
+    (kube_apiserver_service.resources[0].status.loadBalancer.ingress | default([]) | length > 0)
   retries: "{{ external_access_resource_wait_retries }}"
   delay: "{{ external_access_resource_wait_delay }}"
 
@@ -68,18 +68,16 @@
 - name: Create dns records
   when: >-
     external_access_base_domain in external_access_supported_base_domains | default([])
-  amazon.aws.route53:
-    state: present
-    zone: "{{ external_access_base_domain }}"
-    record: "{{ item.name }}"
-    type: A
-    ttl: "{{ external_access_dns_ttl }}"
-    value: "{{ item.addr | ansible.utils.ipaddr('address') }}"
-    wait: true
-    overwrite: true
-  environment:
-    AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') | trim }}"
-    AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') | trim }}"
+  ansible.builtin.include_role:
+    name: dns.api.dns
+    tasks_from: create
+  vars:
+    dns_zone: "{{ external_access_base_domain }}"
+    dns_record_name: "{{ item.name }}"
+    dns_record_type: A
+    dns_record_ttl: "{{ external_access_dns_ttl }}"
+    dns_record_value: "{{ item.addr | ansible.utils.ipaddr('address') }}"
+    dns_record_overwrite: true
   loop:
     - name: "{{ external_access_api_domain }}"
       addr: "{{ external_access_api_floating_ip }}"

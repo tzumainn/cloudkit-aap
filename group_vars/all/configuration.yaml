@@ -64,3 +64,7 @@ server_mgmt_route_gateway: "{{ lookup('env', 'SERVER_MGMT_ROUTE_GATEWAY') }}"
 # SSH key content is written to files by the osac.service.write_ssh_keys role.
 server_ssh_bastion_host: "{{ lookup('env', 'SERVER_SSH_BASTION_HOST') }}"
 server_ssh_bastion_user: "{{ lookup('env', 'SERVER_SSH_BASTION_USER') }}"
+
+# DNS configuration
+dns_class: "{{ lookup('env', 'DNS_CLASS', default='dns.route53.dns') }}"
+dns_zone: "{{ lookup('env', 'DNS_ZONE', default=external_access_base_domain) }}"
