@@ -5,7 +5,7 @@ argument_specs:
         type: str
         required: true
         description: "Tenant name (e.g. from compute_instance.status.tenantReference.name) used to look up the Tenant CR."
-      tenant_storage_class_tenant_namespace:
+      tenant_namespace:
         type: str
         required: true
         description: "Namespace of the Tenant CR on the management cluster (e.g. from compute_instance.status.tenantReference.namespace)."

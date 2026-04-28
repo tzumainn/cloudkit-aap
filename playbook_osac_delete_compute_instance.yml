@@ -9,16 +9,16 @@
     template_id: "{{ ansible_eda.event.payload.spec.templateID }}"
 
   pre_tasks:
-    - name: Determine working namespace
+    - name: Determine tenant target namespace
       ansible.builtin.include_role:
-        name: osac.service.compute_instance_working_namespace
+        name: osac.service.tenant_target_namespace
 
   tasks:
     - name: Display compute instance deletion information
       ansible.builtin.debug:
         msg:
           - "Deleting compute instance: {{ compute_instance_name }}"
-          - "Compute instance working namespace: {{ compute_instance_working_namespace }}"
+          - "Tenant target namespace: {{ tenant_target_namespace }}"
           - "Template ID: {{ template_id }}"
 
     - name: Call the selected compute instance template for deletion

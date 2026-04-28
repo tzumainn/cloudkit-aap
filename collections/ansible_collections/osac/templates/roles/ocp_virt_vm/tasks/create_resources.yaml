@@ -25,7 +25,7 @@
       metadata:
         name: "{{ compute_instance_name }}-root-disk"
         labels: "{{ default_vm_labels }}"
-        namespace: "{{ vm_target_namespace }}"
+        namespace: "{{ compute_instance_target_namespace }}"
       spec:
         source:
           registry:
@@ -49,7 +49,7 @@
       metadata:
         name: "{{ compute_instance_name }}-disk-{{ idx + 1 }}"
         labels: "{{ default_vm_labels }}"
-        namespace: "{{ vm_target_namespace }}"
+        namespace: "{{ compute_instance_target_namespace }}"
       spec:
         source:
           blank: {}
@@ -95,7 +95,7 @@
       kind: VirtualMachine
       metadata:
         name: "{{ compute_instance_name }}"
-        namespace: "{{ vm_target_namespace }}"
+        namespace: "{{ compute_instance_target_namespace }}"
         labels: "{{ default_vm_labels }}"
       spec:
         runStrategy: "{{ vm_run_strategy }}"
@@ -124,7 +124,7 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachineInstance
     name: "{{ compute_instance_name }}"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     state: absent
   when: restart_requested | bool
 
@@ -134,7 +134,7 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachineInstance
     name: "{{ compute_instance_name }}"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
   register: vmi_info
   until:
     - vmi_info.resources | length > 0

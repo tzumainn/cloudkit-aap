@@ -25,7 +25,7 @@
         ansible_eda:
           event:
             payload: "{{ test_compute_instance }}"
-        compute_instance_working_namespace: "computeinstance-test-vm-work"
+        tenant_target_namespace: "computeinstance-test-vm-work"
 
         # Override 3 workflow extension points
         hook_workflow_start:

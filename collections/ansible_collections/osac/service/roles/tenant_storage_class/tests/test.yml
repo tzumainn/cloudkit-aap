@@ -41,7 +41,7 @@
         name: osac.service.tenant_storage_class
       vars:
         tenant_storage_class_tenant_name: "{{ test_tenant_name }}"
-        tenant_storage_class_tenant_namespace: "{{ test_tenant_namespace }}"
+        tenant_namespace: "{{ test_tenant_namespace }}"
       when:
         - test_tenant_name is defined
         - test_tenant_namespace is defined
@@ -76,7 +76,7 @@
             name: osac.service.tenant_storage_class
           vars:
             tenant_storage_class_tenant_name: "{{ test_tenant_name_not_ready }}"
-            tenant_storage_class_tenant_namespace: "{{ test_tenant_namespace }}"
+            tenant_namespace: "{{ test_tenant_namespace }}"
 
         - name: This task should not be reached -- role should have failed
           ansible.builtin.fail:
@@ -109,7 +109,7 @@
             name: osac.service.tenant_storage_class
           vars:
             tenant_storage_class_tenant_name: "{{ test_tenant_name_missing }}"
-            tenant_storage_class_tenant_namespace: "{{ test_tenant_namespace }}"
+            tenant_namespace: "{{ test_tenant_namespace }}"
 
         - name: This task should not be reached -- role should have failed
           ansible.builtin.fail:
@@ -142,7 +142,7 @@
             name: osac.service.tenant_storage_class
           vars:
             tenant_storage_class_tenant_name: "{{ test_tenant_name_no_sc }}"
-            tenant_storage_class_tenant_namespace: "{{ test_tenant_namespace }}"
+            tenant_namespace: "{{ test_tenant_namespace }}"
 
         - name: This task should not be reached -- role should have failed
           ansible.builtin.fail:

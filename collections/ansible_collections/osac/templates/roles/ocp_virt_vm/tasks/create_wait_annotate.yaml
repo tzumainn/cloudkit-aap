@@ -1,7 +1,7 @@
 ---
 - name: Show VM Namespace and VM Name
   ansible.builtin.debug:
-    msg: "Namespace {{ vm_target_namespace }} - Name: {{ compute_instance_name }}"
+    msg: "Namespace {{ compute_instance_target_namespace }} - Name: {{ compute_instance_name }}"
 
 - name: Wait for VM to be ready
   kubernetes.core.k8s_info:
@@ -9,7 +9,7 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
     wait: true
     wait_condition:
       type: Ready
@@ -35,14 +35,14 @@
     api_version: kubevirt.io/v1
     kind: VirtualMachine
     name: "{{ compute_instance_name }}"
-    namespace: "{{ vm_target_namespace }}"
+    namespace: "{{ compute_instance_target_namespace }}"
   register: vm_status
 
 - name: Display VM information
   ansible.builtin.debug:
     msg:
       - "Virtual Machine '{{ compute_instance_name }}' created successfully"
-      - "Namespace: {{ vm_target_namespace }}"
+      - "Namespace: {{ compute_instance_target_namespace }}"
       - "Image: {{ vm_image_source }}"
       - "CPU Cores: {{ vm_cpu_cores }}/Memory: {{ vm_memory }}"
       - "Root Disk Size: {{ vm_boot_disk_size }}"
