@@ -1,0 +1,142 @@
+---
+# Offline tests for osac.templates.ocp_virt_vm role validation logic.
+# Each play is guarded by a `when` condition -- pass exactly one variable per invocation.
+#
+# No cluster required -- the role uses Jinja2 filter plugins that operate on
+# locally installed collection metadata.
+#
+#   Test 1 (spec defaults are merged correctly):
+#     ansible-playbook ... -e test_create_defaults=true
+#
+#   Test 2 (valid template parameters accepted):
+#     ansible-playbook ... -e test_create_validation_valid=true
+#
+#   Test 3 (invalid template parameters rejected):
+#     ansible-playbook ... -e test_create_validation_invalid=true
+
+# ──────────────────────────────────────────────────────────────
+# Test 1: Verify spec defaults are merged into a minimal fixture
+# Expected: CPU=2, memory=2Gi, disk=10Gi, image=fedora, runStrategy=Always
+# ──────────────────────────────────────────────────────────────
+- name: "Test ocp_virt_vm -- spec defaults are merged correctly"
+  hosts: localhost
+
+  collections:
+    - osac.templates
+
+  tasks:
+    - when: test_create_defaults | default(false) | bool
+      block:
+        - name: Read minimal ComputeInstance fixture (no spec fields)
+          ansible.builtin.set_fact:
+            compute_instance: "{{ lookup('file', 'fixtures/computeinstance-defaults-test.yaml') | from_yaml }}"
+
+        - name: Run create_validate to merge defaults and extract VM config
+          ansible.builtin.include_role:
+            name: osac.templates.ocp_virt_vm
+            tasks_from: create_validate.yaml
+
+        - name: Verify compute instance name
+          ansible.builtin.assert:
+            that:
+              - compute_instance.metadata.name == "test-vm-defaults"
+            fail_msg: "Compute instance name not extracted correctly"
+
+        - name: Verify default CPU cores applied
+          ansible.builtin.assert:
+            that:
+              - vm_cpu_cores is defined
+              - vm_cpu_cores | int == 2
+            fail_msg: "Expected default cpu cores of 2, got {{ vm_cpu_cores | default('undefined') }}"
+
+        - name: Verify default memory applied
+          ansible.builtin.assert:
+            that:
+              - vm_memory is defined
+              - vm_memory == "2Gi"
+            fail_msg: "Expected default memory of 2Gi, got {{ vm_memory | default('undefined') }}"
+
+        - name: Verify default boot disk size applied
+          ansible.builtin.assert:
+            that:
+              - vm_boot_disk_size is defined
+              - vm_boot_disk_size == "10Gi"
+            fail_msg: "Expected default boot disk size of 10Gi, got {{ vm_boot_disk_size | default('undefined') }}"
+
+        - name: Verify default image source applied
+          ansible.builtin.assert:
+            that:
+              - vm_image_source is defined
+              - vm_image_source == "quay.io/containerdisks/fedora:latest"
+            fail_msg: "Expected default image source, got {{ vm_image_source | default('undefined') }}"
+
+        - name: Verify default run strategy applied
+          ansible.builtin.assert:
+            that:
+              - vm_run_strategy is defined
+              - vm_run_strategy == "Always"
+            fail_msg: "Expected default run strategy of Always, got {{ vm_run_strategy | default('undefined') }}"
+
+# ──────────────────────────────────────────────────────────────
+# Test 2: Valid template parameters are accepted
+# Expected: exposed_ports value passes validation and is applied
+# ──────────────────────────────────────────────────────────────
+- name: "Test ocp_virt_vm -- valid template parameters accepted"
+  hosts: localhost
+
+  collections:
+    - osac.templates
+
+  tasks:
+    - when: test_create_validation_valid | default(false) | bool
+      block:
+        - name: Read minimal ComputeInstance fixture
+          ansible.builtin.set_fact:
+            compute_instance: "{{ lookup('file', 'fixtures/computeinstance-defaults-test.yaml') | from_yaml }}"
+
+        - name: Set template parameters with valid exposed_ports
+          ansible.builtin.set_fact:
+            template_parameters:
+              exposed_ports: "22/tcp,80/tcp,443/tcp"
+
+        - name: Run create_validate to merge defaults and validate params
+          ansible.builtin.include_role:
+            name: osac.templates.ocp_virt_vm
+            tasks_from: create_validate.yaml
+
+        - name: Verify custom exposed_ports value applied
+          ansible.builtin.assert:
+            that:
+              - params is defined
+              - params.exposed_ports == "22/tcp,80/tcp,443/tcp"
+            fail_msg: "Expected exposed_ports='22/tcp,80/tcp,443/tcp', got {{ (params | default({})).exposed_ports | default('undefined') }}"
+
+# ──────────────────────────────────────────────────────────────
+# Test 3: Invalid template parameters are rejected
+# Expected: validation fails for malformed exposed_ports value
+# ──────────────────────────────────────────────────────────────
+- name: "Test ocp_virt_vm -- invalid template parameters rejected"
+  hosts: localhost
+
+  collections:
+    - osac.templates
+
+  tasks:
+    - when: test_create_validation_invalid | default(false) | bool
+      block:
+        - name: Set role path from collection
+          ansible.builtin.set_fact:
+            ocp_virt_vm_role_path: "{{ lookup('ansible.builtin.first_found', paths=lookup('ansible.builtin.config', 'COLLECTIONS_PATHS') | map('regex_replace', '$', '/ansible_collections/osac/templates/roles/ocp_virt_vm/meta') | list, files=['osac.yaml']) | dirname | dirname }}"
+
+        - name: Validate with invalid exposed_ports pattern
+          ansible.builtin.set_fact:
+            invalid_result: "{{ {'exposed_ports': 'not-a-valid-port'} | osac.templates.template_validate_params(ocp_virt_vm_role_path) }}"
+          register: validation_result
+          ignore_errors: true
+
+        - name: Verify validation rejected invalid pattern
+          ansible.builtin.assert:
+            that:
+              - validation_result is failed
+              - "'does not match pattern' in validation_result.msg"
+            fail_msg: "Expected validation to reject 'not-a-valid-port' but it {{ 'passed' if validation_result is success else 'failed with: ' + (validation_result.msg | default('unknown error')) }}"
