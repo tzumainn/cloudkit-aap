@@ -4,7 +4,7 @@ set -e
 echo "=== Tearing down test environment ==="
 
 # Delete kind cluster
-kind delete cluster --name osac-test
+KIND_EXPERIMENTAL_PROVIDER=podman kind delete cluster --name osac-test
 
 # Clean up temporary files
 rm -f /tmp/osac_test_overrides.log

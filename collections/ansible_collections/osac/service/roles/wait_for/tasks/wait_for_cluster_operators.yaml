@@ -10,6 +10,7 @@
     api_version: config.openshift.io/v1
     kind: ClusterOperator
     kubeconfig: "{{ wait_for_kubeconfig }}"
+    wait_timeout: "{{ wait_for_request_timeout | default(30) }}"
   register: _wait_co_results
   until: >-
     (_wait_co_results.resources | default([]) | length > 0)

@@ -61,6 +61,19 @@
   vars:
     manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
 
+- name: List already allocated agents
+  kubernetes.core.k8s_info:
+    kind: Agent
+    api_version: agent-install.openshift.io/v1beta1
+    namespace: "{{ default_agent_namespace }}"
+    label_selectors:
+      - "{{ cluster_order_label }}={{ cluster_infra_name }}"
+  register: _existing_cluster_agents
+
+- name: Record already allocated agent names
+  ansible.builtin.set_fact:
+    _existing_agent_names: "{{ _existing_cluster_agents.resources | map(attribute='metadata.name') | list }}"
+
 - name: Select and label new Agent resources
   ansible.builtin.include_role:
     name: osac.service.manage_agents
@@ -128,14 +141,6 @@
     server_cluster_template_id: "{{ _netris_server_cluster_template_id }}"
     server_cluster_template_state: read
 
-- name: Delete existing Netris server cluster
-  ansible.builtin.include_role:
-    name: netris.controller.server_cluster
-  vars:
-    server_cluster_name: "{{ cluster_infra_name }}"
-    server_cluster_state: absent
-    server_cluster_site_id: "{{ netris_site_id }}"
-
 - name: Create Netris server cluster with attached servers
   ansible.builtin.include_role:
     name: netris.controller.server_cluster
@@ -151,27 +156,49 @@
     server_cluster_admin_id: "{{ netris_tenant_id }}"
     server_cluster_admin_name: "{{ netris_tenant_name }}"
 
-- name: Allocate NAT IP from Netris IPAM
+- name: Ensure Netris auth for SNAT lookup
+  ansible.builtin.include_role:
+    name: netris.controller.auth
+  when: netris_session_cookie is not defined
+
+- name: Look up existing SNAT rule
+  ansible.builtin.uri:
+    url: "{{ netris_controller_url }}/api/v2/nat"
+    method: GET
+    headers:
+      Cookie: "connect.sid={{ netris_session_cookie }}"
+    return_content: true
+    status_code: 200
+    timeout: "{{ netris_timeout | default(30) }}"
+    validate_certs: "{{ netris_validate_certs | default(true) }}"
+  register: _snat_lookup_resp
+  no_log: true
+
+- name: Find existing SNAT rule by name
+  ansible.builtin.set_fact:
+    _existing_snat: "{{ (_snat_lookup_resp.json.data | default([])) | selectattr('name', 'equalto', cluster_infra_name + '-snat') | list | first | default(none) }}"
+  when: _snat_lookup_resp.json is mapping
+
+- name: Set SNAT IP from existing rule
+  ansible.builtin.set_fact:
+    netris_nat_snat_ip: "{{ _existing_snat.snatToIP | ansible.utils.ipaddr('host/prefix') }}"
+  when: _existing_snat is defined and _existing_snat is not none
+
+- name: Allocate NAT IP from Netris IPAM (new cluster only)
   ansible.builtin.include_role:
     name: netris.controller.ipam
   vars:
     ipam_site_id: "{{ netris_site_id }}"
     ipam_purpose: nat
     ipam_count: 1
+  when: _existing_snat is not defined or _existing_snat is none
 
-- name: Set dynamically allocated NAT IP
+- name: Set dynamically allocated NAT IP (new cluster only)
   ansible.builtin.set_fact:
     netris_nat_snat_ip: "{{ ipam_allocated_ips[0] }}/32"
+  when: _existing_snat is not defined or _existing_snat is none
 
-- name: Delete existing SNAT rule for VPC subnet
-  ansible.builtin.include_role:
-    name: netris.controller.nat
-  vars:
-    nat_name: "{{ cluster_infra_name }}-snat"
-    nat_state: absent
-    nat_site_id: "{{ netris_site_id }}"
-
-- name: Create SNAT rule for VPC subnet internet access
+- name: Create SNAT rule for VPC subnet internet access (new cluster only)
   ansible.builtin.include_role:
     name: netris.controller.nat
   vars:
@@ -185,12 +212,17 @@
     nat_source_address: "{{ netris_template_ipv4_gateway | ansible.utils.ipsubnet }}"
     nat_snat_to_ip: "{{ netris_nat_snat_ip }}"
     nat_comment: "OSAC SNAT for {{ cluster_infra_name }}"
+  when: _existing_snat is not defined or _existing_snat is none
 
 - name: Set cluster_infra_network_name
   ansible.builtin.set_fact:
     cluster_infra_network_name: "{{ cluster_infra_name }}"
 
-- name: Create NMStateConfig for cluster agents
+- name: Identify newly added agents
+  ansible.builtin.set_fact:
+    _newly_added_agents: "{{ cluster_agents_for_netris.resources | rejectattr('metadata.name', 'in', _existing_agent_names) | list }}"
+
+- name: Create NMStateConfig CRs for all cluster agents
   ansible.builtin.include_role:
     name: osac.service.nmstate_config
   vars:
@@ -200,6 +232,19 @@
     nmstate_config_interface_names: "{{ server_cluster_template_server_nics }}"
     nmstate_config_server_interfaces: "{{ _server_vpc_interfaces }}"
     nmstate_config_mgmt_interface: "{{ _server_mgmt_interface }}"
+    nmstate_config_apply_live: false
+
+- name: Apply NMState config on newly added agents
+  ansible.builtin.include_role:
+    name: osac.service.nmstate_config
+  vars:
+    nmstate_config_state: present
+    nmstate_config_cluster_name: "{{ cluster_infra_name }}"
+    nmstate_config_agents: "{{ _newly_added_agents }}"
+    nmstate_config_interface_names: "{{ server_cluster_template_server_nics }}"
+    nmstate_config_server_interfaces: "{{ _server_vpc_interfaces }}"
+    nmstate_config_mgmt_interface: "{{ _server_mgmt_interface }}"
+  when: _newly_added_agents | length > 0
 
 - name: Add cluster order label to InfraEnv nmStateConfigLabelSelector
   kubernetes.core.k8s:
