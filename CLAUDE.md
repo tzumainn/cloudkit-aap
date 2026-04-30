@@ -32,7 +32,7 @@ osac-aap/
 
 | Collection | Purpose | Key Roles |
 |------------|---------|-----------|
-| **osac.service** | Core utilities | `common`, `finalizer`, `lease`, `wait_for`, `publish_templates` |
+| **osac.service** | Core utilities | `common`, `finalizer`, `lease`, `wait_for`, `publish_templates`, `tenant_storage_class` |
 | **osac.templates** | Infrastructure provisioning | `cudn_net` (networking), `metallb_l2` (PublicIPPool), `ocp_virt_vm` (VMs), `ocp_4_17_small` (clusters) |
 | **osac.workflows** | Multi-step playbooks | Cluster create/delete, compute instance lifecycle |
 | **osac.config_as_code** | AAP configuration | Job templates, inventories, credentials |
@@ -95,7 +95,7 @@ rm -rf vendor && ansible-galaxy collection install -r collections/requirements.y
 ```bash
 # Before committing
 ansible-lint
-ansible-playbook --syntax-check playbook_osac_*.yml
+ansible-playbook --syntax-check playbook_osac_create_subnet.yml
 
 # Commit format
 git commit -s -m "MGMT-XXXXX: description of change"

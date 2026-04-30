@@ -26,7 +26,8 @@ AAP job templates: `osac-{action}-{resource}`
     subnet_name: "{{ ansible_eda.event.payload.metadata.name }}"
     implementation_strategy: >-
       {{ ansible_eda.event.payload.metadata.annotations
-         ['osac.openshift.io/implementation-strategy'] }}
+         ['osac.openshift.io/implementation-strategy']
+         | default(ansible_eda.event.payload.spec.implementationStrategy, true) }}
 
   pre_tasks:
     - name: Show EDA Event
@@ -42,7 +43,7 @@ AAP job templates: `osac-{action}-{resource}`
 
 **Key pattern:**
 1. Playbook receives K8s CR as `ansible_eda.event.payload`
-2. Extracts `implementation-strategy` annotation from CR metadata
+2. Extracts implementation strategy from CR annotation (`osac.openshift.io/implementation-strategy`) or `spec.implementationStrategy` — annotation takes precedence when both are present
 3. Dynamically includes the appropriate role from `osac.templates`
 4. Role performs actual provisioning (creates K8s resources, updates CR)
 
@@ -75,7 +76,7 @@ capabilities:
 |------|---------|-------|
 | `osac.service.common` | Shared utilities (kubeconfig, credentials) | `tasks_from: get_remote_cluster_kubeconfig` |
 | `osac.service.finalizer` | Finalizer management for CRs | `tasks_from: add_finalizer` |
-| `osac.service.lease` | Bare metal lease management | Used by cluster/compute workflows |
+| `osac.service.lease` | Bare-metal lease management | Used by cluster/compute workflows |
 | `osac.service.wait_for` | Polling utilities | Wait for pods, deployments, CRs |
 | `osac.service.tenant_storage_class` | StorageClass discovery | Find tenant-specific storage |
 | `osac.service.publish_templates` | Template registration | Publishes NetworkClass from `meta/osac.yaml` |
@@ -128,7 +129,7 @@ osac.templates.cudn_net (role)
 Namespace + ClusterUserDefinedNetwork
 ```
 
-## Environment Variables
+## Runtime Variables and Environment Variables
 
 | Variable | Purpose | Set By |
 |----------|---------|--------|
