@@ -221,7 +221,7 @@
    "name": "roles/ocp_4_17_small_github/tasks/delete.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "7c1d0ec85dd2655faded3ad028b39c93d40b91eda9d77e5ca25fefa224dbcd11",
+   "chksum_sha256": "193e3e7c3cc6a7e848c465289d19ba10a788460367bcc487641ddcc5b01f8a80",
    "format": 1
   },
   {
@@ -291,7 +291,7 @@
    "name": "roles/ocp_virt_vm/tasks/create.yaml",
    "ftype": "file",
    "chksum_type": "sha256",
-   "chksum_sha256": "1df6973fceec2453202c46ece3d33f73aa27b798f85af35b74da469bb495e0b5",
+   "chksum_sha256": "ae888d1f11e61e8bb75e7200cbab30804346d5ea8268a4e311d7a8c7906a2a8f",
    "format": 1
   },
   {
