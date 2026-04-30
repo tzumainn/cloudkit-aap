@@ -20,16 +20,6 @@ argument_specs:
       template_parameters:
         type: dict
         options:
-          pull_secret:
-            description: >
-              The pull secret contains credentials for authenticating to image repositories.
-            type: str
-            required: true
-          ssh_public_key:
-            description: >
-              A public ssh key that will be installed into the `authorized_keys` file
-              of the `core` user on cluster worker nodes.
-            type: str
           github_client_id:
             description: >
               GitHub Oauth client id
