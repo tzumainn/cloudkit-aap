@@ -4,6 +4,14 @@
     name: osac.service.common
     tasks_from: get_remote_cluster_kubeconfig
 
+- name: Validate PublicIP annotations
+  ansible.builtin.assert:
+    that:
+      - public_ip.metadata is defined
+      - public_ip.metadata.annotations is defined
+      - "'osac.openshift.io/publicippool-name' in public_ip.metadata.annotations"
+    fail_msg: "PublicIP metadata.annotations['osac.openshift.io/publicippool-name'] is required"
+
 - name: Extract PublicIP configuration
   ansible.builtin.set_fact:
     ip_name: "{{ public_ip.metadata.name }}"
