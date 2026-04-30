@@ -68,3 +68,35 @@ server_ssh_bastion_user: "{{ lookup('env', 'SERVER_SSH_BASTION_USER') }}"
 # DNS configuration
 dns_class: "{{ lookup('env', 'DNS_CLASS', default='dns.route53.dns') }}"
 dns_zone: "{{ lookup('env', 'DNS_ZONE', default=external_access_base_domain) }}"
+
+# =============================================================================
+# NICo (NVIDIA Bare Metal Manager) Configuration
+# =============================================================================
+# All sensitive values MUST be provided via environment variables injected by
+# AAP from the cluster-fulfillment-ig Kubernetes Secret.
+
+# API Connection
+nico_api_url: "{{ lookup('env', 'NVIDIA_BMM_API_URL') | default('', true) }}"
+nico_api_path_prefix: "{{ lookup('env', 'NVIDIA_BMM_DEFAULT_API_PATH_PREFIX') | default('forge', true) }}"
+
+# OAuth2 Client Credentials
+nico_client_id: "{{ lookup('env', 'NVIDIA_BMM_CLIENT_ID') | default('', true) }}"
+nico_client_secret: "{{ lookup('env', 'NVIDIA_BMM_CLIENT_SECRET') | default('', true) }}"
+nico_ssa_token_url: "{{ lookup('env', 'NVIDIA_BMM_SSA_TOKEN_URL') | default('', true) }}"
+nico_oauth_scope: "{{ lookup('env', 'NVIDIA_BMM_DEFAULT_OAUTH_SCOPE') | default('', true) }}"
+
+# Multi-tenancy
+nico_org: "{{ lookup('env', 'NVIDIA_BMM_ORG') | default('', true) }}"
+nico_site_id: "{{ lookup('env', 'NVIDIA_BMM_SITE_ID') | default('', true) }}"
+nico_tenant_id: "{{ lookup('env', 'NVIDIA_BMM_TENANT_ID') | default('', true) }}"
+
+# Network
+nico_network_virtualization_type: "{{ lookup('env', 'NVIDIA_BMM_NETWORK_VIRTUALIZATION_TYPE') | default('FNN', true) }}"
+nico_default_ip_block_id: "{{ lookup('env', 'NVIDIA_BMM_DEFAULT_IP_BLOCK_ID') | default('', true) }}"
+nico_mgmt_vpc_id: "{{ lookup('env', 'NVIDIA_BMM_MGMT_VPC_ID') | default('', true) }}"
+nico_ingress_cidr: "{{ lookup('env', 'NVIDIA_BMM_INGRESS_CIDR') | default('', true) }}"
+
+# Instance Provisioning
+nico_default_operating_system_id: "{{ lookup('env', 'NVIDIA_BMM_DEFAULT_OS_ID') | default('', true) }}"
+nico_default_ssh_key_group_id: "{{ lookup('env', 'NVIDIA_BMM_DEFAULT_SSH_KEY_GROUP_ID') | default('', true) }}"
+nico_infra_ipxe_dns_server: "{{ lookup('env', 'NVIDIA_BMM_IPXE_DNS_SERVER') | default('', true) }}"
