@@ -5,7 +5,6 @@
 
   vars:
     public_ip: "{{ ansible_eda.event.payload }}"
-    public_ip_name: "{{ ansible_eda.event.payload.metadata.name }}"
     implementation_strategy: >-
       {{ ansible_eda.event.payload.metadata.annotations['osac.openshift.io/implementation-strategy'] }}
     template_parameters: {}
@@ -19,7 +18,7 @@
     - name: Display PublicIP attach information
       ansible.builtin.debug:
         msg:
-          - "PublicIP name: {{ public_ip_name }}"
+          - "PublicIP id: {{ ansible_eda.event.payload.id }} name: {{ ansible_eda.event.payload.metadata.name | default(ansible_eda.event.payload.id) }}"
           - "Implementation strategy: {{ implementation_strategy }}"
 
     - name: Call the selected PublicIP attach role

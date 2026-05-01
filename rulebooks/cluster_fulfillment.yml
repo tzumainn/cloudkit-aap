@@ -90,7 +90,6 @@
         run_job_template:
           name: "{{ job_template_prefix }}-detach-public-ip"
           organization: "{{ job_template_organization }}"
-          organization: "{{ job_template_organization }}"
 
     - name: Create public IP pool
       condition: event.meta.endpoint == "create-public-ip-pool"
