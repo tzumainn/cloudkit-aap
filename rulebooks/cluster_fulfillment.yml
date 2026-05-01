@@ -63,6 +63,20 @@
           name: "{{ job_template_prefix }}-delete-subnet"
           organization: "{{ job_template_organization }}"
 
+    - name: Create public IP
+      condition: event.meta.endpoint == "create-public-ip"
+      action:
+        run_job_template:
+          name: "{{ job_template_prefix }}-create-public-ip"
+          organization: "{{ job_template_organization }}"
+
+    - name: Delete public IP
+      condition: event.meta.endpoint == "delete-public-ip"
+      action:
+        run_job_template:
+          name: "{{ job_template_prefix }}-delete-public-ip"
+          organization: "{{ job_template_organization }}"
+
     - name: Create public IP pool
       condition: event.meta.endpoint == "create-public-ip-pool"
       action:

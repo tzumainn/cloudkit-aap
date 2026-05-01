@@ -1,12 +1,14 @@
 ---
-- name: Create a PublicIPPool resource
+- name: Create a PublicIP resource
   hosts: localhost
   gather_facts: false
 
   vars:
-    public_ip_pool: "{{ ansible_eda.event.payload }}"
-    public_ip_pool_name: "{{ ansible_eda.event.payload.metadata.name }}"
-    implementation_strategy: "{{ ansible_eda.event.payload.spec.implementationStrategy }}"
+    public_ip: "{{ ansible_eda.event.payload }}"
+    public_ip_name: "{{ ansible_eda.event.payload.metadata.name }}"
+    implementation_strategy: >-
+      {{ ansible_eda.event.payload.metadata.annotations
+         ['osac.openshift.io/implementation-strategy'] }}
     template_parameters: {}
 
   pre_tasks:
@@ -15,14 +17,14 @@
         var: ansible_eda.event.payload
 
   tasks:
-    - name: Display PublicIPPool information
+    - name: Display PublicIP information
       ansible.builtin.debug:
         msg:
-          - "PublicIPPool name: {{ public_ip_pool_name }}"
+          - "PublicIP name: {{ public_ip_name }}"
           - "Implementation strategy: {{ implementation_strategy }}"
           - "Template parameters: {{ template_parameters }}"
 
-    - name: Call the selected PublicIPPool role
+    - name: Call the selected PublicIP role
       ansible.builtin.include_role:
         name: "{{ template_id_override | default('osac.templates.' + (implementation_strategy | replace('-', '_'))) }}"
-        tasks_from: create_public_ip_pool
+        tasks_from: create_public_ip
