@@ -23,5 +23,5 @@
 
     - name: Call the selected PublicIPPool role
       ansible.builtin.include_role:
-        name: "osac.templates.{{ implementation_strategy | replace('-', '_') }}"
+        name: "{{ template_id_override | default('osac.templates.' + (implementation_strategy | replace('-', '_'))) }}"
         tasks_from: delete_public_ip_pool

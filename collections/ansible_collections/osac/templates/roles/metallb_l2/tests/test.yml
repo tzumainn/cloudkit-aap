@@ -243,6 +243,7 @@
               - lb_svc_result.resources[0].spec.type == "LoadBalancer"
               - lb_svc_result.resources[0].spec.ports[0].port == 65535
               - lb_svc_result.resources[0].spec.ports[0].name == "placeholder"
+              - lb_svc_result.resources[0].spec.selector | default({}) | length == 0
             fail_msg: "LoadBalancer Service not created correctly"
             success_msg: "LoadBalancer Service 'osac-publicip-{{ test_ip_name }}' created with correct spec"
 
