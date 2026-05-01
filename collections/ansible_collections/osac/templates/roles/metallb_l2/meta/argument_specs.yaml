@@ -17,10 +17,12 @@ argument_specs:
         default: {}
 
   create_public_ip:
+  attach_public_ip:
     options:
       public_ip:
         type: dict
         required: true
+<<<<<<< HEAD
         description: PublicIP CR from fulfillment-api via EDA payload
       public_ip_name:
         type: str
@@ -33,15 +35,38 @@ argument_specs:
         default: {}
 
   delete_public_ip:
+=======
+        description: >-
+          Full PublicIP CR dict from fulfillment-api via EDA payload.
+          Must carry annotations osac.openshift.io/publicip-target-namespace
+          and osac.openshift.io/publicippool-name.
+      public_ip_name:
+        type: str
+        required: true
+        description: metadata.name of the PublicIP CR
+
+  detach_public_ip:
+>>>>>>> 72aac9c (Add tasks for attach and detach public IP to VM)
     options:
       public_ip:
         type: dict
         required: true
+<<<<<<< HEAD
         description: PublicIP CR from fulfillment-api via EDA payload
       public_ip_name:
         type: str
         required: true
         description: Name of the PublicIP resource
+=======
+        description: >-
+          Full PublicIP CR dict from fulfillment-api via EDA payload.
+          Must carry annotations osac.openshift.io/publicip-target-namespace
+          and osac.openshift.io/publicippool-name.
+      public_ip_name:
+        type: str
+        required: true
+        description: metadata.name of the PublicIP CR
+>>>>>>> 72aac9c (Add tasks for attach and detach public IP to VM)
 
   delete_public_ip_pool:
     options:

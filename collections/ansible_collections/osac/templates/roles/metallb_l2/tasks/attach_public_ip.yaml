@@ -1,0 +1,160 @@
+---
+- name: Include get remote cluster kubeconfig
+  ansible.builtin.include_role:
+    name: osac.service.common
+    tasks_from: get_remote_cluster_kubeconfig
+
+- name: Validate PublicIP annotations
+  ansible.builtin.assert:
+    that:
+      - public_ip.metadata is defined
+      - public_ip.metadata.annotations is defined
+      - "'osac.openshift.io/publicippool-name' in public_ip.metadata.annotations"
+      - "'osac.openshift.io/publicip-target-namespace' in public_ip.metadata.annotations"
+    fail_msg: >-
+      PublicIP is missing required annotations:
+      osac.openshift.io/publicippool-name and
+      osac.openshift.io/publicip-target-namespace must both be set.
+
+- name: Extract PublicIP attach configuration
+  ansible.builtin.set_fact:
+    attach_vm_namespace: >-
+      {{ public_ip.metadata.annotations['osac.openshift.io/publicip-target-namespace'] }}
+    attach_pool_name: >-
+      {{ public_ip.metadata.annotations['osac.openshift.io/publicippool-name'] }}
+
+- name: Fetch ComputeInstance CR by ID
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+    api_version: osac.openshift.io/v1alpha1
+    kind: ComputeInstance
+    name: "{{ public_ip.spec.computeInstance }}"
+    namespace: "{{ public_ip.metadata.namespace }}"
+  register: attach_ci_lookup
+
+- name: Fail if ComputeInstance not found
+  ansible.builtin.fail:
+    msg: >-
+      ComputeInstance '{{ public_ip.spec.computeInstance }}' not found in
+      namespace '{{ public_ip.metadata.namespace }}'.
+  when: attach_ci_lookup.resources | length == 0
+
+- name: Extract ComputeInstance name and namespace from fetched CR
+  ansible.builtin.set_fact:
+    attach_compute_instance_name: "{{ attach_ci_lookup.resources[0].metadata.name }}"
+    attach_compute_instance_namespace: "{{ attach_ci_lookup.resources[0].metadata.namespace }}"
+
+# Read the reserved IP directly from the parking Service status.
+- name: Read reserved IP from parking Service
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+    api_version: v1
+    kind: Service
+    name: "osac-publicip-{{ public_ip_name }}"
+    namespace: metallb-system
+  register: parking_service_info
+
+- name: Fail if parking Service not found or IP not yet assigned
+  ansible.builtin.fail:
+    msg: >-
+      Parking Service 'osac-publicip-{{ public_ip_name }}' not found in metallb-system
+      or MetalLB has not yet assigned an IP. Run create_public_ip first.
+  when: >-
+    parking_service_info.resources | length == 0 or
+    parking_service_info.resources[0].status.loadBalancer.ingress | default([]) | length == 0
+
+- name: Extract allocated IP from parking Service status
+  ansible.builtin.set_fact:
+    attach_ip_address: "{{ parking_service_info.resources[0].status.loadBalancer.ingress[0].ip }}"
+
+- name: Display PublicIP attach information
+  ansible.builtin.debug:
+    msg:
+      - "Attaching PublicIP '{{ public_ip_name }}'"
+      - "IP address: {{ attach_ip_address }} (read from parking Service)"
+      - "Pool: {{ attach_pool_name }}"
+      - "VM namespace: {{ attach_vm_namespace }}"
+      - "ComputeInstance: {{ attach_compute_instance_name }} ({{ attach_compute_instance_namespace }})"
+
+# Remove the parking Service from metallb-system.
+- name: Delete parking Service from metallb-system
+  kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+    state: absent
+    api_version: v1
+    kind: Service
+    name: "osac-publicip-{{ public_ip_name }}"
+    namespace: metallb-system
+    wait: true
+    wait_timeout: 60
+  register: reservation_delete_result
+  retries: 3
+  delay: 5
+  until: >-
+    reservation_delete_result is successful
+    or ('NotFound' in (reservation_delete_result.msg | default('')))
+  failed_when:
+    - reservation_delete_result.failed | default(false)
+    - "'NotFound' not in (reservation_delete_result.msg | default(''))"
+
+- name: Display parking Service deletion result
+  ansible.builtin.debug:
+    msg:
+      - "Parking Service 'osac-publicip-{{ public_ip_name }}' deleted"
+      - "Changed: {{ reservation_delete_result.changed | default(false) }}"
+
+# Create a LoadBalancer Service in the VM namespace.
+- name: Create LoadBalancer Service in VM namespace
+  kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ public_ip_name }}-lb"
+        namespace: "{{ attach_vm_namespace }}"
+        labels:
+          osac.openshift.io/publicip: "{{ public_ip_name }}"
+          osac.io/managed-by: osac-fulfillment
+        annotations:
+          metallb.universe.tf/address-pool: "{{ attach_pool_name }}"
+          metallb.universe.tf/loadBalancerIPs: "{{ attach_ip_address }}"
+      spec:
+        type: LoadBalancer
+        selector:
+          vm.kubevirt.io/name: "{{ attach_compute_instance_name }}"
+        ports:
+          - name: ssh
+            port: 22
+            targetPort: 22
+            protocol: TCP
+  register: lb_service_result
+
+- name: Display LoadBalancer Service creation result
+  ansible.builtin.debug:
+    msg:
+      - "LoadBalancer Service '{{ public_ip_name }}-lb' created in '{{ attach_vm_namespace }}'"
+      - "Changed: {{ lb_service_result.changed | default(false) }}"
+
+# Annotate the ComputeInstance CR with the assigned floating IP.
+- name: Annotate ComputeInstance with floating-ip-address
+  kubernetes.core.k8s:
+    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+    api_version: osac.openshift.io/v1alpha1
+    kind: ComputeInstance
+    name: "{{ attach_compute_instance_name }}"
+    namespace: "{{ attach_compute_instance_namespace }}"
+    state: present
+    definition:
+      metadata:
+        annotations:
+          osac.openshift.io/floating-ip-address: "{{ attach_ip_address }}"
+  register: ci_annotate_result
+
+- name: Display ComputeInstance annotation result
+  ansible.builtin.debug:
+    msg:
+      - "ComputeInstance '{{ attach_compute_instance_name }}' annotated with floating-ip-address '{{ attach_ip_address }}'"
+      - "Changed: {{ ci_annotate_result.changed | default(false) }}"
