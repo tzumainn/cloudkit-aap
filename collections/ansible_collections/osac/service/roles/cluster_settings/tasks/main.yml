@@ -67,6 +67,17 @@
       ansible.builtin.set_fact:
         cluster_settings_ssh_public_key: "{{ default_cluster_credentials.resources[0].data.ssh_public_key | b64decode }}"
 
+- name: Fail if pull_secret could not be resolved
+  ansible.builtin.fail:
+    msg: >-
+      pull_secret is empty after checking all sources
+      (spec.pullSecret, templateParameters, and the provider default Secret
+      '{{ cluster_settings_default_credentials_secret_name }}'
+      in namespace '{{ cluster_settings_default_credentials_secret_namespace }}').
+      Supply a pull secret via --pull-secret-file, spec.pullSecret, or configure
+      the provider default Secret.
+  when: not cluster_settings_pull_secret
+
 # Write resolved values back into template_parameters for backward compatibility
 - name: Merge resolved credentials into template parameters
   ansible.builtin.set_fact:
