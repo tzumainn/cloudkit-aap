@@ -4,3 +4,6 @@ wait_for_cluster_retries: 180
 wait_for_cluster_delay: 10
 wait_for_clusteroperators_retries: 60
 wait_for_clusteroperators_delay: 30
+wait_for_nodes_retries: 60
+wait_for_nodes_delay: 30
+wait_for_nodes_expected_count: 2

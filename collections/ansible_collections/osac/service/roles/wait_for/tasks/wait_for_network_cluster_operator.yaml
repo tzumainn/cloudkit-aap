@@ -4,6 +4,7 @@
     kind: ClusterOperator
     name: network
     kubeconfig: "{{ wait_for_kubeconfig }}"
+    wait_timeout: "{{ wait_for_request_timeout | default(30) }}"
   register: network_cluster_operator_results
   until: condition.status == "True"
   retries: "{{ wait_for_cluster_retries }}"

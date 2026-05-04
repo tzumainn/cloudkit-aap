@@ -4,6 +4,24 @@
     name: netris.controller.auth
   when: netris_session_cookie is not defined
 
+- name: Get existing server clusters
+  ansible.builtin.uri:
+    url: "{{ netris_controller_url }}/api/v2/server-cluster"
+    method: GET
+    headers:
+      Cookie: "connect.sid={{ netris_session_cookie }}"
+    return_content: true
+    status_code: 200
+    timeout: "{{ netris_timeout | default(30) }}"
+    validate_certs: "{{ netris_validate_certs | default(true) }}"
+  register: _sc_list_resp
+  no_log: true
+
+- name: Find existing server cluster by name
+  ansible.builtin.set_fact:
+    _existing_server_cluster: "{{ (_sc_list_resp.json.data | default([])) | selectattr('name', 'equalto', server_cluster_name) | list | first | default(none) }}"
+  when: _sc_list_resp.json is mapping
+
 - name: Set server names list
   ansible.builtin.set_fact:
     _server_names: "{{ server_cluster_servers }}"
@@ -22,6 +40,7 @@
       Cookie: "connect.sid={{ netris_session_cookie }}"
     return_content: true
     status_code: 200
+    timeout: "{{ netris_timeout | default(30) }}"
     validate_certs: "{{ netris_validate_certs | default(true) }}"
   register: _inv_resp
 
@@ -43,6 +62,30 @@
     - server_cluster_servers[0] is mapping
     - server_cluster_servers[0].id is defined
 
+- name: Build update body (servers and tags only)
+  ansible.builtin.set_fact:
+    _update_body:
+      servers: "{{ _server_cluster_servers | default([]) }}"
+      tags: "{{ server_cluster_tags | default([]) }}"
+  when: _existing_server_cluster is defined and _existing_server_cluster is not none
+
+- name: Update existing server cluster
+  ansible.builtin.uri:
+    url: "{{ netris_controller_url }}/api/v2/server-cluster/{{ _existing_server_cluster.id }}"
+    method: PUT
+    headers:
+      Cookie: "connect.sid={{ netris_session_cookie }}"
+      Content-Type: "application/json"
+    body_format: json
+    body: "{{ _update_body }}"
+    return_content: true
+    status_code: [200]
+    timeout: "{{ netris_timeout | default(30) }}"
+    validate_certs: "{{ netris_validate_certs | default(true) }}"
+  register: _update_resp
+  no_log: true
+  when: _existing_server_cluster is defined and _existing_server_cluster is not none
+
 - name: Build create body (base)
   ansible.builtin.set_fact:
     _create_body:
@@ -50,21 +93,30 @@
       site: "{{ {'id': server_cluster_site_id | int} }}"
       servers: "{{ _server_cluster_servers | default([]) }}"
       tags: "{{ server_cluster_tags | default([]) }}"
-      vpc: "{{ {'id': 0, 'name': 'Create New'} }}"
+      vpc: >-
+        {{
+          {'id': server_cluster_vpc_id | int, 'name': server_cluster_vpc_name | default('')}
+          if (server_cluster_vpc_id is defined and server_cluster_vpc_id)
+          else {'id': 0, 'name': 'Create New'}
+        }}
+  when: _existing_server_cluster is not defined or _existing_server_cluster is none
 
 - name: Build create body (with template)
   ansible.builtin.set_fact:
     _create_body: "{{ _create_body | default({}) | combine({'srvClusterTemplate': {'id': server_cluster_template_id}}) }}"
-  when: server_cluster_template_id is defined
+  when:
+    - _existing_server_cluster is not defined or _existing_server_cluster is none
+    - server_cluster_template_id is defined
 
 - name: Build create body (with admin)
   ansible.builtin.set_fact:
     _create_body: "{{ _create_body | default({}) | combine({'admin': {'id': server_cluster_admin_id, 'name': server_cluster_admin_name}}) }}"
   when:
+    - _existing_server_cluster is not defined or _existing_server_cluster is none
     - server_cluster_admin_id is defined
     - server_cluster_admin_name is defined
 
-- name: Create server cluster
+- name: Create new server cluster
   ansible.builtin.uri:
     url: "{{ netris_controller_url }}/api/v2/server-cluster"
     method: POST
@@ -75,16 +127,22 @@
     body: "{{ _create_body }}"
     return_content: true
     status_code: [200, 201]
+    timeout: "{{ netris_timeout | default(30) }}"
     validate_certs: "{{ netris_validate_certs | default(true) }}"
   register: _create_resp
+  when: _existing_server_cluster is not defined or _existing_server_cluster is none
 
-- name: Set server_cluster_id from create response
+- name: Set server_cluster_id from response
   ansible.builtin.set_fact:
-    server_cluster_id: "{{ _create_resp.json.data.id | default(_create_resp.json.data) }}"
-    server_cluster_created: true
-  when: _create_resp.json is mapping
+    server_cluster_id: >-
+      {{
+        _existing_server_cluster.id
+        if (_existing_server_cluster is defined and _existing_server_cluster is not none)
+        else (_create_resp.json.data.id | default(_create_resp.json.data))
+      }}
+    server_cluster_created: "{{ _existing_server_cluster is not defined or _existing_server_cluster is none }}"
 
-- name: Wait for server cluster to be provisioned
+- name: Wait for server cluster to be active
   ansible.builtin.uri:
     url: "{{ netris_controller_url }}/api/v2/server-cluster/{{ server_cluster_id }}"
     method: GET
@@ -92,18 +150,17 @@
       Cookie: "connect.sid={{ netris_session_cookie }}"
     return_content: true
     status_code: 200
+    timeout: "{{ netris_timeout | default(30) }}"
     validate_certs: "{{ netris_validate_certs | default(true) }}"
   register: _state_resp
   until: _state_resp.json is mapping and ((_state_resp.json.data | default({}))['status'] | default({}))['label'] | default('') == 'Active'
   retries: 30
   delay: 10
-  when: _create_resp.json is mapping
 
-- name: Set server_cluster_vpc_id from provisioned server cluster
+- name: Set server_cluster_vpc_id from server cluster
   ansible.builtin.set_fact:
     server_cluster_vpc_id: "{{ (_state_resp.json.data | default({})).vpc.id | default((_state_resp.json.data | default({})).vpcId) }}"
     server_cluster_vpc_name: "{{ (_state_resp.json.data | default({})).vpc.name | default('') }}"
   when:
-    - _create_resp.json is mapping
     - _state_resp.json is mapping
     - (_state_resp.json.data | default({})).vpc is defined or (_state_resp.json.data | default({})).vpcId is defined

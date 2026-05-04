@@ -8,7 +8,7 @@ echo "=== Setting up test environment ==="
 
 # 0. Delete existing cluster if it exists
 echo "Cleaning up any existing test cluster..."
-kind delete cluster --name osac-test 2>/dev/null || true
+KIND_EXPERIMENTAL_PROVIDER=podman kind delete cluster --name osac-test 2>/dev/null || true
 
 # 0.5. Install required Python libraries
 echo "Installing required Python libraries..."
@@ -16,11 +16,11 @@ pip install --user kubernetes openstacksdk 2>/dev/null || pip3 install --user ku
 
 # 1. Create kind cluster
 echo "Creating kind cluster..."
-kind create cluster --name osac-test --wait 5m
+KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster --name osac-test --wait 5m
 
 # 1.5. Export kubeconfig to dedicated file
 echo "Exporting kubeconfig to dedicated file..."
-kind export kubeconfig --name osac-test --kubeconfig "${SCRIPT_DIR}/kubeconfig-osac-test"
+KIND_EXPERIMENTAL_PROVIDER=podman kind export kubeconfig --name osac-test --kubeconfig "${SCRIPT_DIR}/kubeconfig-osac-test"
 echo "Kubeconfig exported to: ${SCRIPT_DIR}/kubeconfig-osac-test"
 
 # 2. Clone osac-operator for CRDs
