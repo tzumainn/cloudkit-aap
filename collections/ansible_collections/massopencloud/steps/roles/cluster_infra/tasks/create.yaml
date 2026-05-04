@@ -2,6 +2,37 @@
   ansible.builtin.debug:
     var: cluster_infra_node_requests
 
+- name: Build BareMetalPool hostSets
+  ansible.builtin.set_fact:
+    baremetalpool_host_sets: >-
+      {{ baremetalpool_host_sets | default([]) + [{
+        'hostType': item.resourceClass,
+        'replicas': item.numberOfNodes | int
+      }] }}
+  loop: "{{ cluster_infra_node_requests }}"
+
+# For now, we create the BareMetalPool in the POD_NAMESPACE, but
+# in the future, we hope to have it created in the cluster_working_namespace.
+# This requires updates to the bare-metal-fulfillment-operator
+
+- name: Step - Create BareMetalPool
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: osac.openshift.io/v1alpha1
+      kind: BareMetalPool
+      metadata:
+        name: "{{ cluster_infra_name }}"
+        namespace: "{{ lookup('env', 'POD_NAMESPACE') }}"
+        labels: "{{ {cluster_order_label: cluster_infra_name} }}"
+      spec:
+        hostSets: "{{ baremetalpool_host_sets }}"
+  register: baremetalpool_response
+
+- name: Set BareMetalPool UID
+  ansible.builtin.set_fact:
+    baremetalpool_uid: "{{ baremetalpool_response.result.metadata.uid }}"
+
 - name: Create cluster network
   ansible.builtin.include_role:
     name: massopencloud.esi.network
@@ -17,44 +48,50 @@
   ansible.builtin.set_fact:
     cluster_infra_network_name: "network-{{ cluster_infra_name }}"
 
-# Handle scale down **before** scale up: if we add new agents first,
-# they may not have spec.clusterDeployment.name set by the time
-# we run detach_and_unlabel_all_removed_agents, causing them to be
-# erroneously detached.
+- name: Calculate total desired nodes
+  ansible.builtin.set_fact:
+    total_desired_nodes: "{{ cluster_infra_node_requests | map(attribute='numberOfNodes') | map('int') | sum }}"
 
-- name: Retrieve all currently allocated node pools
+- name: Wait for HostLeases to be allocated
   kubernetes.core.k8s_info:
-    api_version: hypershift.openshift.io/v1beta1
-    kind: NodePool
-    namespace: "{{ cluster_working_namespace }}"
-  register: current_node_pools
+    api_version: osac.openshift.io/v1alpha1
+    kind: HostLease
+    namespace: "{{ lookup('env', 'POD_NAMESPACE') }}"
+  register: hostleases_result
+  until: >
+    (
+      hostleases_result.resources |
+      selectattr('metadata.ownerReferences', 'defined') |
+      map(attribute='metadata.ownerReferences') |
+      flatten |
+      selectattr('controller', 'defined') |
+      selectattr('controller', 'equalto', true) |
+      selectattr('uid', 'equalto', baremetalpool_uid) |
+      list | length
+    ) == (total_desired_nodes | int)
+  retries: 60
+  delay: 10
 
-- name: Set resource classes included in the request
+- name: Initialize allocated host IDs
   ansible.builtin.set_fact:
-    requested_resource_classes: >
-      {{ cluster_infra_node_requests | map(attribute='resourceClass') }}
+    allocated_host_ids: []
 
-- name: Determine which resource classes are no longer needed
+- name: Build allocated host IDs from HostLeases
   ansible.builtin.set_fact:
-    removed_resource_classes: "{{ removed_resource_classes | default([]) + [item.metadata.labels[agent_resource_class_label]] }}"
-  with_items: "{{ current_node_pools.resources }}"
+    allocated_host_ids: "{{ allocated_host_ids + [item.spec.externalHostID] }}"
+  loop: "{{ hostleases_result.resources }}"
   when:
-    - item.metadata.labels is defined
-    - agent_resource_class_label in item.metadata.labels
-    - item.metadata.labels[agent_resource_class_label] not in requested_resource_classes
+    - item.metadata.ownerReferences is defined
+    - item.metadata.ownerReferences | selectattr('controller', 'defined') | selectattr('controller', 'equalto', true) | selectattr('uid', 'equalto', baremetalpool_uid) | list | length > 0
+    - item.spec.externalHostID is defined
+    - item.spec.externalHostID != ''
 
-- name: Display additional resource classes to be removed
+- name: Display allocated host IDs
   ansible.builtin.debug:
-    msg: "The following resource classes are no longer requested: {{ removed_resource_classes | default([]) }}"
+    msg: "Allocated host IDs: {{ allocated_host_ids }}"
 
-- name: Initialize updated cluster infra node requests that will include removed resource classes
-  ansible.builtin.set_fact:
-    updated_cluster_infra_node_requests: "{{ cluster_infra_node_requests }}"
-
-- name: Add removed resource classes to updated cluster infra node requests
-  ansible.builtin.set_fact:
-    updated_cluster_infra_node_requests: "{{ updated_cluster_infra_node_requests + [{'numberOfNodes': '0', 'resourceClass': item}] }}"
-  with_items: "{{ removed_resource_classes | default([]) }}"
+# Handle scale down **before** scale up: detach agents not in the
+# HostLease allocation before attaching new ones.
 
 - name: Wait for the Agents to be removed from the cluster
   ansible.builtin.include_role:
@@ -62,9 +99,9 @@
     tasks_from: wait_for_agents_to_be_removed
   vars:
     manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
-    manage_agents_desired_count: "{{ item.numberOfNodes | int }}"
-    manage_agents_resource_class: "{{ item.resourceClass }}"
-  loop: "{{ updated_cluster_infra_node_requests }}"
+    manage_agents_desired_count: "{{ item.replicas }}"
+    manage_agents_resource_class: "{{ item.hostType }}"
+  loop: "{{ baremetalpool_host_sets }}"
 
 - name: Detach agents from cluster
   ansible.builtin.include_role:
@@ -73,20 +110,69 @@
   vars:
     manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
 
-- name: Select and label new Agent resources
-  ansible.builtin.include_role:
-    name: osac.service.manage_agents
-    tasks_from: select_and_label_new_agents
-  vars:
-    manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
-    manage_agents_desired_count: "{{ item.numberOfNodes | int }}"
-    manage_agents_resource_class: "{{ item.resourceClass }}"
-  loop: "{{ cluster_infra_node_requests }}"
+- name: Get all agents in the namespace
+  kubernetes.core.k8s_info:
+    kind: Agent
+    api_version: agent-install.openshift.io/v1beta1
+    namespace: "{{ default_agent_namespace }}"
+  register: all_agents_result
 
-- name: Attach agents to cluster network and approve them
+- name: Initialize agents to attach list
+  ansible.builtin.set_fact:
+    agents_to_attach: []
+
+- name: Select agents matching allocated host IDs
+  ansible.builtin.set_fact:
+    agents_to_attach: "{{ agents_to_attach + [item] }}"
+  loop: "{{ all_agents_result.resources }}"
+  when:
+    - item.metadata.annotations is defined
+    - item.metadata.annotations['osac.openshift.io/host_uuid'] is defined
+    - item.metadata.annotations['osac.openshift.io/host_uuid'] in allocated_host_ids
+  loop_control:
+    label: "Selected agent {{ item.metadata.name }}"
+
+- name: Fail if not all leased hosts resolved to agents
+  ansible.builtin.fail:
+    msg: >-
+      Resolved {{ agents_to_attach | length }} Agents for
+      {{ allocated_host_ids | length }} leased hosts.
+  when: (agents_to_attach | length) != (allocated_host_ids | length)
+
+- name: Display hosts to attach to cluster network
+  ansible.builtin.debug:
+    msg: "Hosts to attach: {{ allocated_host_ids }}"
+
+- name: Display agents to label
+  ansible.builtin.debug:
+    msg: "Agents to label: {{ agents_to_attach | map(attribute='metadata.name') | list }}"
+
+- name: Attach new agents's hosts to cluster network
   ansible.builtin.include_role:
-    name: osac.service.manage_agents
-    tasks_from: attach_and_approve_all_new_agents
+    name: massopencloud.esi.l2
+    tasks_from: set_networks_for_node
   vars:
-    manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
-    manage_agents_cluster_network: "{{ cluster_infra_network_name }}"
+    node: "{{ item }}"
+    networks:
+    - "{{ cluster_infra_network_name }}"
+  loop: "{{ allocated_host_ids }}"
+  loop_control:
+    label: "Attach host {{ item }}"
+
+- name: Label selected agents with cluster order
+  kubernetes.core.k8s_json_patch:
+    api_version: agent-install.openshift.io/v1beta1
+    kind: Agent
+    name: "{{ agent.metadata.name }}"
+    namespace: "{{ agent.metadata.namespace }}"
+    patch:
+      - op: add
+        path: /metadata/labels/{{ cluster_order_label | osac.service.json_pointer_escape }}
+        value: "{{ cluster_infra_name }}"
+      - op: add
+        path: /spec/approved
+        value: true
+  loop: "{{ agents_to_attach }}"
+  loop_control:
+    loop_var: agent
+    label: "Labeling agent {{ agent.metadata.name }}"
