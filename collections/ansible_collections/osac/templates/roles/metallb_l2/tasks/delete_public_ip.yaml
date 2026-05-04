@@ -6,12 +6,12 @@
 
 - name: Extract PublicIP configuration
   ansible.builtin.set_fact:
-    ip_name: "{{ public_ip.metadata.name }}"
+    ip_id: "{{ public_ip.id }}"
 
 - name: Display deletion information
   ansible.builtin.debug:
     msg:
-      - "Deleting LoadBalancer Service for PublicIP '{{ ip_name }}'"
+      - "Deleting LoadBalancer Service for PublicIP id='{{ ip_id }}'"
 
 - name: Delete LoadBalancer Service
   kubernetes.core.k8s:
@@ -19,7 +19,7 @@
     state: absent
     api_version: v1
     kind: Service
-    name: "osac-publicip-{{ ip_name }}"
+    name: "osac-publicip-{{ ip_id }}"
     namespace: metallb-system
     wait: true
     wait_timeout: 300
@@ -36,5 +36,5 @@
 - name: Display LoadBalancer Service deletion result
   ansible.builtin.debug:
     msg:
-      - "LoadBalancer Service 'osac-publicip-{{ ip_name }}' deletion completed"
+      - "LoadBalancer Service 'osac-publicip-{{ ip_id }}' deletion completed"
       - "Changed: {{ lb_service_delete_result.changed | default(false) }}"

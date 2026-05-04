@@ -13,10 +13,14 @@
       - public_ip.metadata.annotations is defined
       - "'osac.openshift.io/publicippool-name' in public_ip.metadata.annotations"
       - "'osac.openshift.io/publicip-target-namespace' in public_ip.metadata.annotations"
+      - public_ip.spec is defined
+      - public_ip.spec.computeInstance is defined
+      - public_ip.spec.computeInstance | length > 0
     fail_msg: >-
       PublicIP is missing required fields/annotations:
-      id must be set, and annotations osac.openshift.io/publicippool-name
-      and osac.openshift.io/publicip-target-namespace must both be present.
+      id and spec.computeInstance must be set, and annotations
+      osac.openshift.io/publicippool-name and
+      osac.openshift.io/publicip-target-namespace must both be present.
 
 - name: Extract PublicIP attach configuration
   ansible.builtin.set_fact:
@@ -33,14 +37,12 @@
     api_version: osac.openshift.io/v1alpha1
     kind: ComputeInstance
     name: "{{ public_ip.spec.computeInstance }}"
-    namespace: "{{ public_ip.metadata.namespace }}"
   register: attach_ci_lookup
 
 - name: Fail if ComputeInstance not found
   ansible.builtin.fail:
     msg: >-
-      ComputeInstance '{{ public_ip.spec.computeInstance }}' not found in
-      namespace '{{ public_ip.metadata.namespace }}'.
+      ComputeInstance '{{ public_ip.spec.computeInstance }}' not found.
   when: attach_ci_lookup.resources | length == 0
 
 - name: Extract ComputeInstance name and namespace from fetched CR
@@ -81,67 +83,108 @@
       - "VM namespace: {{ attach_vm_namespace }}"
       - "ComputeInstance: {{ attach_compute_instance_name }} ({{ attach_compute_instance_namespace }})"
 
-# Remove the parking Service from metallb-system.
-- name: Delete parking Service from metallb-system
-  kubernetes.core.k8s:
-    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
-    state: absent
-    api_version: v1
-    kind: Service
-    name: "osac-publicip-{{ public_ip_id }}"
-    namespace: metallb-system
-    wait: true
-    wait_timeout: 60
-  register: reservation_delete_result
-  retries: 3
-  delay: 5
-  until: >-
-    reservation_delete_result is successful
-    or ('NotFound' in (reservation_delete_result.msg | default('')))
-  failed_when:
-    - reservation_delete_result.failed | default(false)
-    - "'NotFound' not in (reservation_delete_result.msg | default(''))"
+# Delete the parking Service and create the VM-namespace LB Service atomically.
+# The rescue restores the parking Service if LB Service creation fails so the IP
+# is never left unparked without a reservation in metallb-system.
+- name: Attach PublicIP - delete parking Service and create LB Service
+  block:
+    - name: Delete parking Service from metallb-system
+      kubernetes.core.k8s:
+        kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+        state: absent
+        api_version: v1
+        kind: Service
+        name: "osac-publicip-{{ public_ip_id }}"
+        namespace: metallb-system
+        wait: true
+        wait_timeout: 60
+      register: reservation_delete_result
+      retries: 3
+      delay: 5
+      until: >-
+        reservation_delete_result is successful
+        or ('NotFound' in (reservation_delete_result.msg | default('')))
+      failed_when:
+        - reservation_delete_result.failed | default(false)
+        - "'NotFound' not in (reservation_delete_result.msg | default(''))"
 
-- name: Display parking Service deletion result
-  ansible.builtin.debug:
-    msg:
-      - "Parking Service 'osac-publicip-{{ public_ip_id }}' deleted"
-      - "Changed: {{ reservation_delete_result.changed | default(false) }}"
+    - name: Display parking Service deletion result
+      ansible.builtin.debug:
+        msg:
+          - "Parking Service 'osac-publicip-{{ public_ip_id }}' deleted"
+          - "Changed: {{ reservation_delete_result.changed | default(false) }}"
 
-# Create a LoadBalancer Service in the VM namespace.
-- name: Create LoadBalancer Service in VM namespace
-  kubernetes.core.k8s:
-    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
-    state: present
-    apply: true
-    definition:
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: "{{ public_ip_id }}-lb"
-        namespace: "{{ attach_vm_namespace }}"
-        labels:
-          osac.openshift.io/publicip: "{{ public_ip_id }}"
-          osac.io/managed-by: osac-fulfillment
-        annotations:
-          metallb.universe.tf/address-pool: "{{ attach_pool_name }}"
-          metallb.universe.tf/loadBalancerIPs: "{{ attach_ip_address }}"
-      spec:
-        type: LoadBalancer
-        selector:
-          vm.kubevirt.io/name: "{{ attach_compute_instance_name }}"
-        ports:
-          - name: ssh
-            port: 22
-            targetPort: 22
-            protocol: TCP
-  register: lb_service_result
+    # Create a LoadBalancer Service in the VM namespace.
+    - name: Create LoadBalancer Service in VM namespace
+      kubernetes.core.k8s:
+        kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+        state: present
+        apply: true
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: "{{ public_ip_id }}-lb"
+            namespace: "{{ attach_vm_namespace }}"
+            labels:
+              osac.openshift.io/publicip: "{{ public_ip_id }}"
+              osac.io/managed-by: osac-fulfillment
+            annotations:
+              metallb.universe.tf/address-pool: "{{ attach_pool_name }}"
+              metallb.universe.tf/loadBalancerIPs: "{{ attach_ip_address }}"
+          spec:
+            type: LoadBalancer
+            selector:
+              vm.kubevirt.io/name: "{{ attach_compute_instance_name }}"
+            # Initial floating IP support exposes SSH only.
+            # Additional ports can be added as needed for other access patterns.
+            ports:
+              - name: ssh
+                port: 22
+                targetPort: 22
+                protocol: TCP
+      register: lb_service_result
 
-- name: Display LoadBalancer Service creation result
-  ansible.builtin.debug:
-    msg:
-      - "LoadBalancer Service '{{ public_ip_id }}-lb' created in '{{ attach_vm_namespace }}'"
-      - "Changed: {{ lb_service_result.changed | default(false) }}"
+    - name: Display LoadBalancer Service creation result
+      ansible.builtin.debug:
+        msg:
+          - "LoadBalancer Service '{{ public_ip_id }}-lb' created in '{{ attach_vm_namespace }}'"
+          - "Changed: {{ lb_service_result.changed | default(false) }}"
+
+  rescue:
+    - name: Restore parking Service in metallb-system after failed LB Service creation
+      kubernetes.core.k8s:
+        kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+        state: present
+        apply: true
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: "osac-publicip-{{ public_ip_id }}"
+            namespace: metallb-system
+            labels:
+              osac.openshift.io/publicip: "{{ public_ip_id }}"
+              osac.io/managed-by: osac-fulfillment
+            annotations:
+              metallb.universe.tf/address-pool: "{{ attach_pool_name }}"
+              metallb.universe.tf/loadBalancerIPs: "{{ attach_ip_address }}"
+          spec:
+            type: LoadBalancer
+            selector: {}
+            ports:
+              - name: placeholder
+                protocol: TCP
+                port: 65535
+                targetPort: 65535
+      when: reservation_delete_result.changed | default(false)
+
+    - name: Fail after attempted rollback of attach operation
+      ansible.builtin.fail:
+        msg: >-
+          Attach of PublicIP '{{ public_ip_name }}' failed; the parking Service
+          'osac-publicip-{{ public_ip_id }}' in metallb-system has been restored
+          if it had been deleted. Check the preceding error for details.
 
 # Annotate the ComputeInstance CR with the assigned floating IP.
 - name: Annotate ComputeInstance with floating-ip-address

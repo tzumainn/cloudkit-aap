@@ -13,10 +13,14 @@
       - public_ip.metadata.annotations is defined
       - "'osac.openshift.io/publicippool-name' in public_ip.metadata.annotations"
       - "'osac.openshift.io/publicip-target-namespace' in public_ip.metadata.annotations"
+      - public_ip.spec is defined
+      - public_ip.spec.computeInstance is defined
+      - public_ip.spec.computeInstance | length > 0
     fail_msg: >-
       PublicIP is missing required fields/annotations:
-      id must be set, and annotations osac.openshift.io/publicippool-name
-      and osac.openshift.io/publicip-target-namespace must both be present.
+      id and spec.computeInstance must be set, and annotations
+      osac.openshift.io/publicippool-name and
+      osac.openshift.io/publicip-target-namespace must both be present.
 
 - name: Extract PublicIP detach configuration
   ansible.builtin.set_fact:
@@ -33,14 +37,12 @@
     api_version: osac.openshift.io/v1alpha1
     kind: ComputeInstance
     name: "{{ public_ip.spec.computeInstance }}"
-    namespace: "{{ public_ip.metadata.namespace }}"
   register: detach_ci_lookup
 
 - name: Fail if ComputeInstance not found
   ansible.builtin.fail:
     msg: >-
-      ComputeInstance '{{ public_ip.spec.computeInstance }}' not found in
-      namespace '{{ public_ip.metadata.namespace }}'.
+      ComputeInstance '{{ public_ip.spec.computeInstance }}' not found.
   when: detach_ci_lookup.resources | length == 0
 
 - name: Extract ComputeInstance name and namespace from fetched CR
@@ -81,107 +83,147 @@
       - "VM namespace: {{ detach_vm_namespace }}"
       - "ComputeInstance: {{ detach_compute_instance_name }} ({{ detach_compute_instance_namespace }})"
 
-# Delete the LoadBalancer Service from the VM namespace.
-- name: Delete LoadBalancer Service from VM namespace
-  kubernetes.core.k8s:
-    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
-    state: absent
-    api_version: v1
-    kind: Service
-    name: "{{ public_ip_id }}-lb"
-    namespace: "{{ detach_vm_namespace }}"
-    wait: true
-    wait_timeout: 60
-  register: lb_service_delete_result
-  retries: 3
-  delay: 5
-  until: >-
-    lb_service_delete_result is successful
-    or ('NotFound' in (lb_service_delete_result.msg | default('')))
-  failed_when:
-    - lb_service_delete_result.failed | default(false)
-    - "'NotFound' not in (lb_service_delete_result.msg | default(''))"
+# Delete the LB Service, clear the annotation, and restore the placeholder atomically.
+# The rescue restores the LB Service if placeholder re-creation fails so the IP
+# is never left unparked without a reservation in metallb-system.
+- name: Detach PublicIP - remove LB Service, clear annotation, restore placeholder
+  block:
+    - name: Delete LoadBalancer Service from VM namespace
+      kubernetes.core.k8s:
+        kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+        state: absent
+        api_version: v1
+        kind: Service
+        name: "{{ public_ip_id }}-lb"
+        namespace: "{{ detach_vm_namespace }}"
+        wait: true
+        wait_timeout: 60
+      register: lb_service_delete_result
+      retries: 3
+      delay: 5
+      until: >-
+        lb_service_delete_result is successful
+        or ('NotFound' in (lb_service_delete_result.msg | default('')))
+      failed_when:
+        - lb_service_delete_result.failed | default(false)
+        - "'NotFound' not in (lb_service_delete_result.msg | default(''))"
 
-- name: Display LB Service deletion result
-  ansible.builtin.debug:
-    msg:
-      - "LoadBalancer Service '{{ public_ip_id }}-lb' deleted from '{{ detach_vm_namespace }}'"
-      - "Changed: {{ lb_service_delete_result.changed | default(false) }}"
+    - name: Display LB Service deletion result
+      ansible.builtin.debug:
+        msg:
+          - "LoadBalancer Service '{{ public_ip_id }}-lb' deleted from '{{ detach_vm_namespace }}'"
+          - "Changed: {{ lb_service_delete_result.changed | default(false) }}"
 
-# Remove floating-ip-address annotation from the ComputeInstance CR.
-- name: Fetch ComputeInstance to inspect annotations
-  kubernetes.core.k8s_info:
-    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
-    api_version: osac.openshift.io/v1alpha1
-    kind: ComputeInstance
-    name: "{{ detach_compute_instance_name }}"
-    namespace: "{{ detach_compute_instance_namespace }}"
-  register: ci_info
+    # Remove floating-ip-address annotation from the ComputeInstance CR.
+    - name: Fetch ComputeInstance to inspect annotations
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+        api_version: osac.openshift.io/v1alpha1
+        kind: ComputeInstance
+        name: "{{ detach_compute_instance_name }}"
+        namespace: "{{ detach_compute_instance_namespace }}"
+      register: ci_info
 
-- name: Remove floating-ip-address annotation from ComputeInstance CR
-  kubernetes.core.k8s_json_patch:
-    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
-    api_version: osac.openshift.io/v1alpha1
-    kind: ComputeInstance
-    name: "{{ detach_compute_instance_name }}"
-    namespace: "{{ detach_compute_instance_namespace }}"
-    patch:
-      - op: remove
-        path: /metadata/annotations/osac.openshift.io~1floating-ip-address
-  register: ci_patch_result
-  when: >-
-    ci_info.resources | length > 0 and
-    (ci_info.resources[0].metadata.annotations | default({}))
-    ['osac.openshift.io/floating-ip-address'] is defined
+    - name: Remove floating-ip-address annotation from ComputeInstance CR
+      kubernetes.core.k8s_json_patch:
+        kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+        api_version: osac.openshift.io/v1alpha1
+        kind: ComputeInstance
+        name: "{{ detach_compute_instance_name }}"
+        namespace: "{{ detach_compute_instance_namespace }}"
+        patch:
+          - op: remove
+            path: /metadata/annotations/osac.openshift.io~1floating-ip-address
+      register: ci_patch_result
+      when: >-
+        ci_info.resources | length > 0 and
+        (ci_info.resources[0].metadata.annotations | default({}))
+        ['osac.openshift.io/floating-ip-address'] is defined
 
-- name: Display ComputeInstance annotation removal result
-  ansible.builtin.debug:
-    msg:
-      - "ComputeInstance '{{ detach_compute_instance_name }}': floating-ip-address annotation removed"
-      - "Changed: {{ ci_patch_result.changed | default(false) }}"
-  when: ci_patch_result is not skipped
+    - name: Display ComputeInstance annotation removal result
+      ansible.builtin.debug:
+        msg:
+          - "ComputeInstance '{{ detach_compute_instance_name }}': floating-ip-address annotation removed"
+          - "Changed: {{ ci_patch_result.changed | default(false) }}"
+      when: ci_patch_result is not skipped
 
-- name: Display ComputeInstance annotation already absent
-  ansible.builtin.debug:
-    msg: >-
-      ComputeInstance '{{ detach_compute_instance_name }}':
-      floating-ip-address annotation not present, nothing to remove
-  when: ci_patch_result is skipped
+    - name: Display ComputeInstance annotation already absent
+      ansible.builtin.debug:
+        msg: >-
+          ComputeInstance '{{ detach_compute_instance_name }}':
+          floating-ip-address annotation not present, nothing to remove
+      when: ci_patch_result is skipped
 
-# Re-create the placeholder reservation Service in metallb-system.
-- name: Re-create placeholder Service in metallb-system
-  kubernetes.core.k8s:
-    kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
-    state: present
-    apply: true
-    definition:
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: "osac-publicip-{{ public_ip_id }}"
-        namespace: metallb-system
-        labels:
-          osac.openshift.io/publicip: "{{ public_ip_id }}"
-          osac.io/managed-by: osac-fulfillment
-        annotations:
-          metallb.universe.tf/address-pool: "{{ detach_pool_name }}"
-          metallb.universe.tf/loadBalancerIPs: "{{ detach_ip_address }}"
-      spec:
-        type: LoadBalancer
-        selector: {}
-        ports:
-          - name: placeholder
-            protocol: TCP
-            port: 65535
-            targetPort: 65535
-  register: placeholder_service_result
-  retries: 60
-  delay: 10
-  until: placeholder_service_result is successful
+    # Re-create the placeholder reservation Service in metallb-system.
+    - name: Re-create placeholder Service in metallb-system
+      kubernetes.core.k8s:
+        kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+        state: present
+        apply: true
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: "osac-publicip-{{ public_ip_id }}"
+            namespace: metallb-system
+            labels:
+              osac.openshift.io/publicip: "{{ public_ip_id }}"
+              osac.io/managed-by: osac-fulfillment
+            annotations:
+              metallb.universe.tf/address-pool: "{{ detach_pool_name }}"
+              metallb.universe.tf/loadBalancerIPs: "{{ detach_ip_address }}"
+          spec:
+            type: LoadBalancer
+            selector: {}
+            ports:
+              - name: placeholder
+                protocol: TCP
+                port: 65535
+                targetPort: 65535
+      register: placeholder_service_result
+      retries: 60
+      delay: 10
+      until: placeholder_service_result is successful
 
-- name: Display placeholder Service creation result
-  ansible.builtin.debug:
-    msg:
-      - "Placeholder Service 'osac-publicip-{{ public_ip_id }}' re-created in metallb-system"
-      - "IP preserved: {{ detach_ip_address }}"
-      - "Changed: {{ placeholder_service_result.changed | default(false) }}"
+    - name: Display placeholder Service creation result
+      ansible.builtin.debug:
+        msg:
+          - "Placeholder Service 'osac-publicip-{{ public_ip_id }}' re-created in metallb-system"
+          - "IP preserved: {{ detach_ip_address }}"
+          - "Changed: {{ placeholder_service_result.changed | default(false) }}"
+
+  rescue:
+    - name: Restore LoadBalancer Service in VM namespace after failed placeholder re-creation
+      kubernetes.core.k8s:
+        kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
+        state: present
+        apply: true
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: "{{ public_ip_id }}-lb"
+            namespace: "{{ detach_vm_namespace }}"
+            labels:
+              osac.openshift.io/publicip: "{{ public_ip_id }}"
+              osac.io/managed-by: osac-fulfillment
+            annotations:
+              metallb.universe.tf/address-pool: "{{ detach_pool_name }}"
+              metallb.universe.tf/loadBalancerIPs: "{{ detach_ip_address }}"
+          spec:
+            type: LoadBalancer
+            selector:
+              vm.kubevirt.io/name: "{{ detach_compute_instance_name }}"
+            ports:
+              - name: ssh
+                port: 22
+                targetPort: 22
+                protocol: TCP
+      when: lb_service_delete_result.changed | default(false)
+
+    - name: Fail after attempted rollback of detach operation
+      ansible.builtin.fail:
+        msg: >-
+          Detach of PublicIP '{{ public_ip_name }}' failed; the LoadBalancer Service
+          '{{ public_ip_id }}-lb' in '{{ detach_vm_namespace }}' has been restored
+          if it had been deleted. Check the preceding error for details.

@@ -22,10 +22,10 @@ argument_specs:
         type: dict
         required: true
         description: PublicIP CR from fulfillment-api via EDA payload
-      public_ip_name:
+      public_ip_id:
         type: str
         required: true
-        description: Name of the PublicIP resource
+        description: ID of the PublicIP resource
       template_parameters:
         type: dict
         description: Template-specific parameters (reserved for future use)
@@ -38,17 +38,20 @@ argument_specs:
         type: dict
         required: true
         description: PublicIP CR from fulfillment-api via EDA payload
-      public_ip_name:
+      public_ip_id:
         type: str
         required: true
-        description: Name of the PublicIP resource
+        description: ID of the PublicIP resource
 
   attach_public_ip:
     options:
       public_ip:
         type: dict
         required: true
-        description: PublicIP CR from fulfillment-api via EDA payload
+        description: >-
+          PublicIP CR from fulfillment-api via EDA payload. Must include
+          annotations osac.openshift.io/publicippool-name and
+          osac.openshift.io/publicip-target-namespace.
       template_parameters:
         type: dict
         description: Template-specific parameters (reserved for future use)
@@ -60,7 +63,10 @@ argument_specs:
       public_ip:
         type: dict
         required: true
-        description: PublicIP CR from fulfillment-api via EDA payload
+        description: >-
+          PublicIP CR from fulfillment-api via EDA payload. Must include
+          annotations osac.openshift.io/publicippool-name and
+          osac.openshift.io/publicip-target-namespace.
       template_parameters:
         type: dict
         description: Template-specific parameters (reserved for future use)
