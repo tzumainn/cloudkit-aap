@@ -8,6 +8,7 @@ template_type: network
 
 # NetworkClass registration fields
 implementation_strategy: cudn_net
+is_default: true
 capabilities:
   supports_ipv4: true
   supports_ipv6: true

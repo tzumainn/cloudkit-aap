@@ -286,6 +286,7 @@ class Metadata(Base):
     allowed_resource_classes: list[str] | None = None
     # Network-specific fields
     implementation_strategy: str | None = None
+    is_default: bool = False
     capabilities: NetworkClassCapabilities | None = None
     parameters: list[TemplateParameterDefinition] = pydantic.Field(default_factory=list)
 
@@ -363,6 +364,7 @@ class NetworkClassTemplate(Base):
     title: str
     description: str | None = None
     implementation_strategy: str
+    is_default: bool = False
     capabilities: NetworkClassCapabilities
 
     @pydantic.field_serializer("path")
