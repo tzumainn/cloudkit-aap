@@ -1,6 +1,6 @@
 - name: Detach agents from cluster
   ansible.builtin.include_role:
-    name: manage_agents
+    name: osac.service.manage_agents
     tasks_from: detach_and_unlabel_all_removed_agents
   vars:
     manage_agents_cluster_order_name: "{{ cluster_infra_name }}"

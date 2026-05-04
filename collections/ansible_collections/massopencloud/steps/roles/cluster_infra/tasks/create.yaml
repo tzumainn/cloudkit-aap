@@ -58,7 +58,7 @@
 
 - name: Wait for the Agents to be removed from the cluster
   ansible.builtin.include_role:
-    name: manage_agents
+    name: osac.service.manage_agents
     tasks_from: wait_for_agents_to_be_removed
   vars:
     manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
@@ -68,14 +68,14 @@
 
 - name: Detach agents from cluster
   ansible.builtin.include_role:
-    name: manage_agents
+    name: osac.service.manage_agents
     tasks_from: detach_and_unlabel_all_removed_agents
   vars:
     manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
 
 - name: Select and label new Agent resources
   ansible.builtin.include_role:
-    name: manage_agents
+    name: osac.service.manage_agents
     tasks_from: select_and_label_new_agents
   vars:
     manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
@@ -85,7 +85,7 @@
 
 - name: Attach agents to cluster network and approve them
   ansible.builtin.include_role:
-    name: manage_agents
+    name: osac.service.manage_agents
     tasks_from: attach_and_approve_all_new_agents
   vars:
     manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
@@ -93,7 +93,7 @@
 
 - name: Approve agents assigned to the cluster
   ansible.builtin.include_role:
-    name: manage_agents
+    name: osac.service.manage_agents
     tasks_from: attach_and_approve_all_new_agents
   vars:
     manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
