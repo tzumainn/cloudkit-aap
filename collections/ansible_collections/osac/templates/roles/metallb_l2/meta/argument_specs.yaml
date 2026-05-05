@@ -74,7 +74,7 @@ argument_specs:
         description: Template-specific parameters (reserved for future use)
         options: {}
         default: {}
-        
+
   delete_public_ip_pool:
     options:
       public_ip_pool:

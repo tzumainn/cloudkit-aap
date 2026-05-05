@@ -191,7 +191,7 @@
           '{{ public_ip_name }}-lb' in '{{ detach_vm_namespace }}' has been restored
           if it had been deleted. Check the preceding error for details.
 
-# Remove the floating-ip-address annotation from the ComputeInstance CR. 
+# Remove the floating-ip-address annotation from the ComputeInstance CR.
 - name: Fetch ComputeInstance to inspect annotations
   kubernetes.core.k8s_info:
     kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
