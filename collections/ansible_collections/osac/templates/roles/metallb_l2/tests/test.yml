@@ -224,7 +224,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: pre_create_svc
 
@@ -234,7 +234,7 @@
               - pre_create_svc.resources | length == 0
             fail_msg: >-
               Stale LB Service exists from a previous run. Clean up with:
-              oc delete svc osac-publicip-{{ test_ip_name }} -n metallb-system --ignore-not-found
+              oc delete svc osac-pip-{{ test_ip_name }} -n metallb-system --ignore-not-found
             success_msg: "No stale LB Service, proceeding with create"
 
         - name: Create PublicIP via metallb_l2 role
@@ -246,7 +246,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: lb_svc_result
 
@@ -259,7 +259,7 @@
               - lb_svc_result.resources[0].spec.ports[0].name == "placeholder"
               - lb_svc_result.resources[0].spec.selector | default({}) | length == 0
             fail_msg: "LoadBalancer Service not created correctly"
-            success_msg: "LoadBalancer Service 'osac-publicip-{{ test_ip_name }}' created with correct spec"
+            success_msg: "LoadBalancer Service 'osac-pip-{{ test_ip_name }}' created with correct spec"
 
         - name: Verify LoadBalancer Service annotations
           ansible.builtin.assert:
@@ -292,7 +292,7 @@
           kubernetes.core.k8s:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
             state: absent
           when: ansible_failed_result is defined
@@ -322,7 +322,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: pre_delete_svc
 
@@ -342,7 +342,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: svc_after_delete
 
@@ -351,7 +351,7 @@
             that:
               - svc_after_delete.resources | length == 0
             fail_msg: "LB Service still exists after delete"
-            success_msg: "LB Service 'osac-publicip-{{ test_ip_name }}' successfully deleted"
+            success_msg: "LB Service 'osac-pip-{{ test_ip_name }}' successfully deleted"
 
 # ──────────────────────────────────────────────────────────────
 # Test: Delete PublicIP when already gone (NotFound handling)
@@ -377,7 +377,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: pre_notfound_svc
 
@@ -607,7 +607,7 @@
               apiVersion: v1
               kind: Service
               metadata:
-                name: "osac-publicip-{{ test_ip_name }}"
+                name: "osac-pip-{{ test_ip_name }}"
                 namespace: metallb-system
                 annotations:
                   metallb.universe.tf/address-pool: "{{ test_pool_name }}"
@@ -631,7 +631,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: parking_svc_info
           retries: 60
@@ -650,7 +650,7 @@
               kubernetes.core.k8s_info:
                 api_version: v1
                 kind: Service
-                name: "{{ test_ip_name }}-lb"
+                name: "osac-pip-{{ test_ip_name }}-ingress"
                 namespace: "{{ test_vm_namespace }}"
               register: pre_attach_lb_svc
 
@@ -659,8 +659,8 @@
                 that:
                   - pre_attach_lb_svc.resources | length == 0
                 fail_msg: >-
-                  Stale LB Service '{{ test_ip_name }}-lb' already exists in '{{ test_vm_namespace }}'.
-                  Clean up with: oc delete svc {{ test_ip_name }}-lb -n {{ test_vm_namespace }} --ignore-not-found
+                  Stale LB Service 'osac-pip-{{ test_ip_name }}-ingress' already exists in '{{ test_vm_namespace }}'.
+                  Clean up with: oc delete svc osac-pip-{{ test_ip_name }}-ingress -n {{ test_vm_namespace }} --ignore-not-found
                 success_msg: "No stale LB Service in VM namespace, proceeding with attach"
 
         - name: Run attach_public_ip role
@@ -672,7 +672,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: parking_svc_after_attach
 
@@ -681,13 +681,13 @@
             that:
               - parking_svc_after_attach.resources | length == 0
             fail_msg: "Parking Service still exists in metallb-system after attach"
-            success_msg: "Parking Service 'osac-publicip-{{ test_ip_name }}' correctly removed from metallb-system"
+            success_msg: "Parking Service 'osac-pip-{{ test_ip_name }}' correctly removed from metallb-system"
 
         - name: Fetch LoadBalancer Service in VM namespace
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "{{ test_ip_name }}-lb"
+            name: "osac-pip-{{ test_ip_name }}-ingress"
             namespace: "{{ test_vm_namespace }}"
           register: lb_svc_result
 
@@ -697,7 +697,7 @@
               - lb_svc_result.resources | length == 1
               - lb_svc_result.resources[0].spec.type == "LoadBalancer"
             fail_msg: "LB Service not created in VM namespace after attach"
-            success_msg: "LB Service '{{ test_ip_name }}-lb' created in '{{ test_vm_namespace }}'"
+            success_msg: "LB Service 'osac-pip-{{ test_ip_name }}-ingress' created in '{{ test_vm_namespace }}'"
 
         - name: Verify LB Service annotations preserve pool and IP
           ansible.builtin.assert:
@@ -745,7 +745,7 @@
           kubernetes.core.k8s:
             api_version: v1
             kind: Service
-            name: "{{ test_ip_name }}-lb"
+            name: "osac-pip-{{ test_ip_name }}-ingress"
             namespace: "{{ test_vm_namespace }}"
             state: absent
           when: ansible_failed_result is defined
@@ -755,7 +755,7 @@
           kubernetes.core.k8s:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
             state: absent
           when: ansible_failed_result is defined
@@ -812,7 +812,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "{{ test_ip_name }}-lb"
+            name: "osac-pip-{{ test_ip_name }}-ingress"
             namespace: "{{ test_vm_namespace }}"
           register: pre_detach_lb_svc
 
@@ -822,7 +822,7 @@
               - pre_detach_lb_svc.resources | length == 1
               - pre_detach_lb_svc.resources[0].status.loadBalancer.ingress | default([]) | length > 0
             fail_msg: >-
-              LB Service '{{ test_ip_name }}-lb' not found in '{{ test_vm_namespace }}' or has no IP.
+              LB Service 'osac-pip-{{ test_ip_name }}-ingress' not found in '{{ test_vm_namespace }}' or has no IP.
               Run the attach test first or run all tests together.
             success_msg: "LB Service exists with IP, proceeding with detach"
 
@@ -839,7 +839,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "{{ test_ip_name }}-lb"
+            name: "osac-pip-{{ test_ip_name }}-ingress"
             namespace: "{{ test_vm_namespace }}"
           register: lb_svc_after_detach
 
@@ -848,7 +848,7 @@
             that:
               - lb_svc_after_detach.resources | length == 0
             fail_msg: "LB Service still exists in VM namespace after detach"
-            success_msg: "LB Service '{{ test_ip_name }}-lb' correctly removed from '{{ test_vm_namespace }}'"
+            success_msg: "LB Service 'osac-pip-{{ test_ip_name }}-ingress' correctly removed from '{{ test_vm_namespace }}'"
 
         - name: Fetch ComputeInstance to verify annotation removed
           kubernetes.core.k8s_info:
@@ -872,7 +872,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: parking_svc_after_detach
           retries: 60
@@ -887,7 +887,7 @@
               - parking_svc_after_detach.resources[0].spec.type == "LoadBalancer"
               - parking_svc_after_detach.resources[0].spec.selector | default({}) | length == 0
             fail_msg: "Re-created parking Service has incorrect spec after detach"
-            success_msg: "Parking Service 'osac-publicip-{{ test_ip_name }}' re-created with correct placeholder spec"
+            success_msg: "Parking Service 'osac-pip-{{ test_ip_name }}' re-created with correct placeholder spec"
 
         - name: Verify parking Service preserves the same IP
           ansible.builtin.assert:
@@ -911,7 +911,7 @@
           kubernetes.core.k8s:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
             state: absent
           ignore_errors: true
