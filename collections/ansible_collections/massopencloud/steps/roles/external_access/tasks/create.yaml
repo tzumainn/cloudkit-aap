@@ -129,7 +129,7 @@
 
 - name: Configure metallb for ingress
   ansible.builtin.include_role:
-    name: metallb_ingress
+    name: osac.service.metallb_ingress
     tasks_from: configure_metallb_ingress
   vars:
     metallb_ingress_admin_kubeconfig: "{{ admin_kubeconfig }}"
