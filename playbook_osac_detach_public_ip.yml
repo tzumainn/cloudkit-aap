@@ -18,7 +18,7 @@
     - name: Display PublicIP detach information
       ansible.builtin.debug:
         msg:
-          - "PublicIP id: {{ ansible_eda.event.payload.id }} name: {{ ansible_eda.event.payload.metadata.name | default(ansible_eda.event.payload.id) }}"
+          - "PublicIP name: {{ ansible_eda.event.payload.metadata.name }}"
           - "Implementation strategy: {{ implementation_strategy }}"
 
     - name: Call the selected PublicIP detach role

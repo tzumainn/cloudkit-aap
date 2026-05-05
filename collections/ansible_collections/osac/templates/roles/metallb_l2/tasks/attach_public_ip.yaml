@@ -7,9 +7,11 @@
 - name: Validate PublicIP fields and annotations
   ansible.builtin.assert:
     that:
-      - public_ip.id is defined
-      - public_ip.id | length > 0
       - public_ip.metadata is defined
+      - public_ip.metadata.name is defined
+      - public_ip.metadata.name | length > 0
+      - public_ip.metadata.namespace is defined
+      - public_ip.metadata.namespace | length > 0
       - public_ip.metadata.annotations is defined
       - "'osac.openshift.io/publicippool-name' in public_ip.metadata.annotations"
       - "'osac.openshift.io/publicip-target-namespace' in public_ip.metadata.annotations"
@@ -18,37 +20,38 @@
       - public_ip.spec.computeInstance | length > 0
     fail_msg: >-
       PublicIP is missing required fields/annotations:
-      id and spec.computeInstance must be set, and annotations
-      osac.openshift.io/publicippool-name and
+      metadata.name, metadata.namespace, and spec.computeInstance must be set,
+      and annotations osac.openshift.io/publicippool-name and
       osac.openshift.io/publicip-target-namespace must both be present.
 
 - name: Extract PublicIP attach configuration
   ansible.builtin.set_fact:
-    public_ip_id: "{{ public_ip.id }}"
-    public_ip_name: "{{ public_ip.metadata.name | default(public_ip.id) }}"
+    public_ip_name: "{{ public_ip.metadata.name }}"
     attach_vm_namespace: >-
       {{ public_ip.metadata.annotations['osac.openshift.io/publicip-target-namespace'] }}
     attach_pool_name: >-
       {{ public_ip.metadata.annotations['osac.openshift.io/publicippool-name'] }}
 
-- name: Fetch ComputeInstance CR by ID
+- name: Fetch ComputeInstance CR
   kubernetes.core.k8s_info:
     kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: osac.openshift.io/v1alpha1
     kind: ComputeInstance
-    name: "{{ public_ip.spec.computeInstance }}"
+    namespace: "{{ public_ip.metadata.namespace }}"
+    label_selectors:
+      - "osac.openshift.io/computeinstance-uuid={{ public_ip.spec.computeInstance }}"
   register: attach_ci_lookup
 
 - name: Fail if ComputeInstance not found
   ansible.builtin.fail:
     msg: >-
-      ComputeInstance '{{ public_ip.spec.computeInstance }}' not found.
+      ComputeInstance with uuid '{{ public_ip.spec.computeInstance }}' not found
+      in namespace '{{ public_ip.metadata.namespace }}'.
   when: attach_ci_lookup.resources | length == 0
 
-- name: Extract ComputeInstance name and namespace from fetched CR
+- name: Extract ComputeInstance name from fetched CR
   ansible.builtin.set_fact:
     attach_compute_instance_name: "{{ attach_ci_lookup.resources[0].metadata.name }}"
-    attach_compute_instance_namespace: "{{ attach_ci_lookup.resources[0].metadata.namespace }}"
 
 # Read the reserved IP directly from the parking Service status.
 - name: Read reserved IP from parking Service
@@ -56,16 +59,15 @@
     kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: v1
     kind: Service
-    name: "osac-publicip-{{ public_ip_id }}"
+    name: "osac-publicip-{{ public_ip_name }}"
     namespace: metallb-system
   register: parking_service_info
 
 - name: Fail if parking Service not found or IP not yet assigned
   ansible.builtin.fail:
     msg: >-
-      Parking Service 'osac-publicip-{{ public_ip_id }}' (PublicIP '{{ public_ip_name }}')
-      not found in metallb-system or MetalLB has not yet assigned an IP.
-      Run create_public_ip first.
+      Parking Service 'osac-publicip-{{ public_ip_name }}' not found in metallb-system
+      or MetalLB has not yet assigned an IP. Run create_public_ip first.
   when: >-
     parking_service_info.resources | length == 0 or
     parking_service_info.resources[0].status.loadBalancer.ingress | default([]) | length == 0
@@ -77,11 +79,11 @@
 - name: Display PublicIP attach information
   ansible.builtin.debug:
     msg:
-      - "Attaching PublicIP id='{{ public_ip_id }}' name='{{ public_ip_name }}'"
+      - "Attaching PublicIP '{{ public_ip_name }}'"
       - "IP address: {{ attach_ip_address }} (read from parking Service)"
       - "Pool: {{ attach_pool_name }}"
       - "VM namespace: {{ attach_vm_namespace }}"
-      - "ComputeInstance: {{ attach_compute_instance_name }} ({{ attach_compute_instance_namespace }})"
+      - "ComputeInstance: {{ attach_compute_instance_name }} ({{ public_ip.metadata.namespace }})"
 
 # Delete the parking Service and create the VM-namespace LB Service atomically.
 # The rescue restores the parking Service if LB Service creation fails so the IP
@@ -94,16 +96,14 @@
         state: absent
         api_version: v1
         kind: Service
-        name: "osac-publicip-{{ public_ip_id }}"
+        name: "osac-publicip-{{ public_ip_name }}"
         namespace: metallb-system
         wait: true
         wait_timeout: 60
       register: reservation_delete_result
       retries: 3
       delay: 5
-      until: >-
-        reservation_delete_result is successful
-        or ('NotFound' in (reservation_delete_result.msg | default('')))
+      until: reservation_delete_result is successful
       failed_when:
         - reservation_delete_result.failed | default(false)
         - "'NotFound' not in (reservation_delete_result.msg | default(''))"
@@ -111,7 +111,7 @@
     - name: Display parking Service deletion result
       ansible.builtin.debug:
         msg:
-          - "Parking Service 'osac-publicip-{{ public_ip_id }}' deleted"
+          - "Parking Service 'osac-publicip-{{ public_ip_name }}' deleted"
           - "Changed: {{ reservation_delete_result.changed | default(false) }}"
 
     # Create a LoadBalancer Service in the VM namespace.
@@ -124,10 +124,10 @@
           apiVersion: v1
           kind: Service
           metadata:
-            name: "{{ public_ip_id }}-lb"
+            name: "{{ public_ip_name }}-lb"
             namespace: "{{ attach_vm_namespace }}"
             labels:
-              osac.openshift.io/publicip: "{{ public_ip_id }}"
+              osac.openshift.io/publicip: "{{ public_ip_name }}"
               osac.io/managed-by: osac-fulfillment
             annotations:
               metallb.universe.tf/address-pool: "{{ attach_pool_name }}"
@@ -144,11 +144,14 @@
                 targetPort: 22
                 protocol: TCP
       register: lb_service_result
+      retries: 6
+      delay: 10
+      until: lb_service_result is successful
 
     - name: Display LoadBalancer Service creation result
       ansible.builtin.debug:
         msg:
-          - "LoadBalancer Service '{{ public_ip_id }}-lb' created in '{{ attach_vm_namespace }}'"
+          - "LoadBalancer Service '{{ public_ip_name }}-lb' created in '{{ attach_vm_namespace }}'"
           - "Changed: {{ lb_service_result.changed | default(false) }}"
 
   rescue:
@@ -161,10 +164,10 @@
           apiVersion: v1
           kind: Service
           metadata:
-            name: "osac-publicip-{{ public_ip_id }}"
+            name: "osac-publicip-{{ public_ip_name }}"
             namespace: metallb-system
             labels:
-              osac.openshift.io/publicip: "{{ public_ip_id }}"
+              osac.openshift.io/publicip: "{{ public_ip_name }}"
               osac.io/managed-by: osac-fulfillment
             annotations:
               metallb.universe.tf/address-pool: "{{ attach_pool_name }}"
@@ -178,12 +181,16 @@
                 port: 65535
                 targetPort: 65535
       when: reservation_delete_result.changed | default(false)
+      register: rescue_parking_result
+      retries: 3
+      delay: 5
+      until: rescue_parking_result is successful
 
     - name: Fail after attempted rollback of attach operation
       ansible.builtin.fail:
         msg: >-
           Attach of PublicIP '{{ public_ip_name }}' failed; the parking Service
-          'osac-publicip-{{ public_ip_id }}' in metallb-system has been restored
+          'osac-publicip-{{ public_ip_name }}' in metallb-system has been restored
           if it had been deleted. Check the preceding error for details.
 
 # Annotate the ComputeInstance CR with the assigned floating IP.
@@ -193,7 +200,7 @@
     api_version: osac.openshift.io/v1alpha1
     kind: ComputeInstance
     name: "{{ attach_compute_instance_name }}"
-    namespace: "{{ attach_compute_instance_namespace }}"
+    namespace: "{{ public_ip.metadata.namespace }}"
     state: present
     definition:
       metadata:

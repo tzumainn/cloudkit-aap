@@ -7,25 +7,25 @@
 - name: Validate PublicIP annotations
   ansible.builtin.assert:
     that:
-      - public_ip.id is defined
-      - public_ip.id | length > 0
       - public_ip.metadata is defined
+      - public_ip.metadata.name is defined
+      - public_ip.metadata.name | length > 0
       - public_ip.metadata.annotations is defined
       - "'osac.openshift.io/publicippool-name' in public_ip.metadata.annotations"
     fail_msg: >-
       PublicIP is missing required fields:
-      id must be set and metadata.annotations['osac.openshift.io/publicippool-name'] is required
+      metadata.name must be set and metadata.annotations['osac.openshift.io/publicippool-name'] is required
 
 - name: Extract PublicIP configuration
   ansible.builtin.set_fact:
-    ip_id: "{{ public_ip.id }}"
+    ip_name: "{{ public_ip.metadata.name }}"
     ip_pool_name: >-
       {{ public_ip.metadata.annotations['osac.openshift.io/publicippool-name'] }}
 
 - name: Display PublicIP information
   ansible.builtin.debug:
     msg:
-      - "Creating LoadBalancer Service for PublicIP id='{{ ip_id }}'"
+      - "Creating LoadBalancer Service for PublicIP '{{ ip_name }}'"
       - "Pool name (IPAddressPool): {{ ip_pool_name }}"
 
 # Empty-selector LB Service reserves an IP from the MetalLB pool without
@@ -39,12 +39,12 @@
       apiVersion: v1
       kind: Service
       metadata:
-        name: "osac-publicip-{{ ip_id }}"
+        name: "osac-publicip-{{ ip_name }}"
         namespace: metallb-system
         annotations:
           metallb.universe.tf/address-pool: "{{ ip_pool_name }}"
         labels:
-          osac.openshift.io/publicip: "{{ ip_id }}"
+          osac.openshift.io/publicip: "{{ ip_name }}"
           osac.io/managed-by: osac-fulfillment
       spec:
         type: LoadBalancer
@@ -62,7 +62,7 @@
 - name: Display LoadBalancer Service creation result
   ansible.builtin.debug:
     msg:
-      - "LoadBalancer Service 'osac-publicip-{{ ip_id }}' created"
+      - "LoadBalancer Service 'osac-publicip-{{ ip_name }}' created"
       - "Changed: {{ lb_service_result.changed | default(false) }}"
 
 - name: Wait for IP assignment
@@ -70,7 +70,7 @@
     kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: v1
     kind: Service
-    name: "osac-publicip-{{ ip_id }}"
+    name: "osac-publicip-{{ ip_name }}"
     namespace: metallb-system
   register: lb_service_info
   retries: 60
@@ -85,4 +85,4 @@
 
 - name: Display assigned IP
   ansible.builtin.debug:
-    msg: "PublicIP id='{{ ip_id }}' assigned address: {{ assigned_ip }}"
+    msg: "PublicIP '{{ ip_name }}' assigned address: {{ assigned_ip }}"
