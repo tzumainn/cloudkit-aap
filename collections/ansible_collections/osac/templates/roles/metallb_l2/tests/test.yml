@@ -537,7 +537,7 @@
 #   - Parking Service deleted from metallb-system
 #   - LoadBalancer Service created in VM namespace with correct
 #     selector, labels, annotations, and the reserved IP
-#   - ComputeInstance annotated with floating-ip-address
+#   - ComputeInstance annotated with public-ip-address
 # Prerequisites:
 #   - IPAddressPool exists (run pool create first or run all tests)
 #   - ComputeInstance CRD installed (osac.openshift.io/v1alpha1)
@@ -730,15 +730,15 @@
             namespace: "{{ test_ci_namespace }}"
           register: ci_after_attach
 
-        - name: Verify ComputeInstance annotated with floating-ip-address
+        - name: Verify ComputeInstance annotated with public-ip-address
           ansible.builtin.assert:
             that:
               - ci_after_attach.resources | length == 1
-              - (ci_after_attach.resources[0].metadata.annotations | default({}))['osac.openshift.io/floating-ip-address'] == pre_attach_ip
-            fail_msg: "ComputeInstance not annotated with floating-ip-address after attach"
+              - (ci_after_attach.resources[0].metadata.annotations | default({}))['osac.openshift.io/public-ip-address'] == pre_attach_ip
+            fail_msg: "ComputeInstance not annotated with public-ip-address after attach"
             success_msg: >-
               ComputeInstance '{{ test_ci_name }}' annotated with
-              floating-ip-address='{{ pre_attach_ip }}'
+              public-ip-address='{{ pre_attach_ip }}'
 
       always:
         - name: Clean up LB Service from VM namespace on failure
@@ -775,7 +775,7 @@
 # Test: Detach PublicIP from a ComputeInstance
 # Expected:
 #   - LoadBalancer Service removed from VM namespace
-#   - floating-ip-address annotation removed from ComputeInstance
+#   - public-ip-address annotation removed from ComputeInstance
 #   - Parking Service re-created in metallb-system with the same IP
 # Prerequisites:
 #   - attach test must have run (or LB Service + annotated ComputeInstance
@@ -858,15 +858,15 @@
             namespace: "{{ test_ci_namespace }}"
           register: ci_after_detach
 
-        - name: Assert floating-ip-address annotation removed from ComputeInstance
+        - name: Assert public-ip-address annotation removed from ComputeInstance
           ansible.builtin.assert:
             that:
               - ci_after_detach.resources | length == 1
               - >-
                 (ci_after_detach.resources[0].metadata.annotations | default({}))
-                ['osac.openshift.io/floating-ip-address'] is not defined
-            fail_msg: "floating-ip-address annotation still present on ComputeInstance after detach"
-            success_msg: "floating-ip-address annotation correctly removed from ComputeInstance '{{ test_ci_name }}'"
+                ['osac.openshift.io/public-ip-address'] is not defined
+            fail_msg: "public-ip-address annotation still present on ComputeInstance after detach"
+            success_msg: "public-ip-address annotation correctly removed from ComputeInstance '{{ test_ci_name }}'"
 
         - name: Wait for parking Service to be re-created in metallb-system
           kubernetes.core.k8s_info:
