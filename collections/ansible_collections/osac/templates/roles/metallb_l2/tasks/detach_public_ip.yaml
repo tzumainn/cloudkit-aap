@@ -191,7 +191,7 @@
           'osac-pip-{{ public_ip_name }}-ingress' in '{{ detach_vm_namespace }}' has been restored
           if it had been deleted. Check the preceding error for details.
 
-# Remove the floating-ip-address annotation from the ComputeInstance CR.
+# Remove the public-ip-address annotation from the ComputeInstance CR.
 - name: Fetch ComputeInstance to inspect annotations
   kubernetes.core.k8s_info:
     kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
@@ -201,7 +201,7 @@
     namespace: "{{ public_ip.metadata.namespace }}"
   register: ci_info
 
-- name: Remove floating-ip-address annotation from ComputeInstance CR
+- name: Remove public-ip-address annotation from ComputeInstance CR
   kubernetes.core.k8s_json_patch:
     kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: osac.openshift.io/v1alpha1
@@ -210,17 +210,17 @@
     namespace: "{{ public_ip.metadata.namespace }}"
     patch:
       - op: remove
-        path: /metadata/annotations/osac.openshift.io~1floating-ip-address
+        path: /metadata/annotations/osac.openshift.io~1public-ip-address
   register: ci_patch_result
   when: >-
     ci_info.resources | length > 0 and
     (ci_info.resources[0].metadata.annotations | default({}))
-    ['osac.openshift.io/floating-ip-address'] is defined
+    ['osac.openshift.io/public-ip-address'] is defined
 
 - name: Display ComputeInstance annotation removal result
   ansible.builtin.debug:
     msg:
-      - "ComputeInstance '{{ detach_compute_instance_name }}': floating-ip-address annotation removed"
+      - "ComputeInstance '{{ detach_compute_instance_name }}': public-ip-address annotation removed"
       - "Changed: {{ ci_patch_result.changed | default(false) }}"
   when: ci_patch_result is defined and ci_patch_result is not skipped
 
@@ -228,5 +228,5 @@
   ansible.builtin.debug:
     msg: >-
       ComputeInstance '{{ detach_compute_instance_name }}':
-      floating-ip-address annotation not present, nothing to remove
+      public-ip-address annotation not present, nothing to remove
   when: ci_patch_result is defined and ci_patch_result is skipped

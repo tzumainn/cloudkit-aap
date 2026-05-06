@@ -193,8 +193,8 @@
           'osac-pip-{{ public_ip_name }}' in metallb-system has been restored
           if it had been deleted. Check the preceding error for details.
 
-# Annotate the ComputeInstance CR with the assigned floating IP.
-- name: Annotate ComputeInstance with floating-ip-address
+# Annotate the ComputeInstance CR with the assigned public IP.
+- name: Annotate ComputeInstance with public-ip-address
   kubernetes.core.k8s:
     kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: osac.openshift.io/v1alpha1
@@ -205,11 +205,11 @@
     definition:
       metadata:
         annotations:
-          osac.openshift.io/floating-ip-address: "{{ attach_ip_address }}"
+          osac.openshift.io/public-ip-address: "{{ attach_ip_address }}"
   register: ci_annotate_result
 
 - name: Display ComputeInstance annotation result
   ansible.builtin.debug:
     msg:
-      - "ComputeInstance '{{ attach_compute_instance_name }}' annotated with floating-ip-address '{{ attach_ip_address }}'"
+      - "ComputeInstance '{{ attach_compute_instance_name }}' annotated with public-ip-address '{{ attach_ip_address }}'"
       - "Changed: {{ ci_annotate_result.changed | default(false) }}"
