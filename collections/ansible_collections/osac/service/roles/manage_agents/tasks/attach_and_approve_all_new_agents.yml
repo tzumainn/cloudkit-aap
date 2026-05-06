@@ -18,7 +18,7 @@
     name: massopencloud.esi.l2
     tasks_from: set_networks_for_node
   vars:
-    node: "{{ item.metadata.annotations['esi.nerc.mghpcc.org/uuid'] }}"
+    node: "{{ item.metadata.annotations[agent_host_uuid_label] }}"
     networks:
     - "{{ manage_agents_cluster_network }}"
   loop: "{{ manage_agents_new }}"

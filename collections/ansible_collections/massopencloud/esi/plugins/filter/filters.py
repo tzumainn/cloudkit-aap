@@ -48,14 +48,14 @@ def get_agent_metadata(node_info_list, agents):
                           if port.get('address')]
         agent_name = mac_to_agent_name(node_addresses, agents)
 
-        annotations = {"esi.nerc.mghpcc.org/uuid": node_info['id']}
+        annotations = {"osac.openshift.io/host_uuid": node_info['id']}
 
         topology = extract_esi_location(node_info['name'])
         topology_labels = {"topology.nerc.mghpcc.org/%s" % label: str(val)
                            for label, val in topology.items()
                            if val is not None}
         resource_class_label = {
-            'esi.nerc.mghpcc.org/resource_class':
+            'osac.openshift.io/resource_class':
                 node_info.get('resource_class', '')
         }
         labels = {**topology_labels, **resource_class_label}
