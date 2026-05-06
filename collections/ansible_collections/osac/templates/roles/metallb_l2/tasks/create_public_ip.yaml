@@ -35,7 +35,7 @@
       apiVersion: v1
       kind: Service
       metadata:
-        name: "osac-publicip-{{ ip_name }}"
+        name: "osac-pip-{{ ip_name }}"
         namespace: metallb-system
         annotations:
           metallb.universe.tf/address-pool: "{{ ip_pool_name }}"
@@ -58,7 +58,7 @@
 - name: Display LoadBalancer Service creation result
   ansible.builtin.debug:
     msg:
-      - "LoadBalancer Service 'osac-publicip-{{ ip_name }}' created"
+      - "LoadBalancer Service 'osac-pip-{{ ip_name }}' created"
       - "Changed: {{ lb_service_result.changed | default(false) }}"
 
 - name: Wait for IP assignment
@@ -66,7 +66,7 @@
     kubeconfig: "{{ remote_cluster_kubeconfig | default(omit) }}"
     api_version: v1
     kind: Service
-    name: "osac-publicip-{{ ip_name }}"
+    name: "osac-pip-{{ ip_name }}"
     namespace: metallb-system
   register: lb_service_info
   retries: 60

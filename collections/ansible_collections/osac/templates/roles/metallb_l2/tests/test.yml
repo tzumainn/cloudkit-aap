@@ -1,9 +1,11 @@
 ---
 # Test playbook for osac.templates.metallb_l2 role.
 #
-# Tests create and delete of MetalLB resources:
+# Tests create, delete, attach, and detach of MetalLB resources:
 #   - PublicIPPool: IPAddressPool and L2Advertisement
 #   - PublicIP: LoadBalancer Service for IP allocation
+#   - Attach: moves IP from parking Service to VM namespace LB Service
+#   - Detach: removes VM namespace LB Service and re-parks the IP
 #
 # Requires a cluster with MetalLB CRDs applied and the metallb-system
 # namespace present. No MetalLB operator is needed for pool tests since
@@ -31,7 +33,20 @@
 #   # Run only PublicIP delete tests (LB Service must already exist)
 #   ansible-playbook test.yml -e run_create=false -e run_create_ip=false \
 #     -e run_delete_ip=true -e run_delete_ip_not_found=false \
-#     -e run_delete=false -e run_delete_not_found=false -v
+#     -e run_delete=false -e run_delete_not_found=false \
+#     -e run_attach=false -e run_detach=false -v
+#
+#   # Run only attach test (pool and parking Service must already exist)
+#   ansible-playbook test.yml -e run_create=false -e run_create_ip=false \
+#     -e run_delete_ip=false -e run_delete_ip_not_found=false \
+#     -e run_delete=false -e run_delete_not_found=false \
+#     -e run_attach=true -e run_detach=false -v
+#
+#   # Run only detach test (attach test must have run first)
+#   ansible-playbook test.yml -e run_create=false -e run_create_ip=false \
+#     -e run_delete_ip=false -e run_delete_ip_not_found=false \
+#     -e run_delete=false -e run_delete_not_found=false \
+#     -e run_attach=false -e run_detach=true -v
 #
 #   # Run all tests with user impersonation (needed when your user lacks
 #   # direct RBAC for metallb-system resources)
@@ -193,9 +208,8 @@
     K8S_AUTH_IMPERSONATE_USER: "{{ test_impersonate_user | default('') }}"
 
   vars:
-    test_ip_name: "test-publicip"
+    test_ip_name: "test-publicip-id"
     test_pool_name: "test-metallb-pool"
-    public_ip_name: "{{ test_ip_name }}"
     public_ip:
       metadata:
         name: "{{ test_ip_name }}"
@@ -210,7 +224,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: pre_create_svc
 
@@ -220,7 +234,7 @@
               - pre_create_svc.resources | length == 0
             fail_msg: >-
               Stale LB Service exists from a previous run. Clean up with:
-              oc delete svc osac-publicip-{{ test_ip_name }} -n metallb-system --ignore-not-found
+              oc delete svc osac-pip-{{ test_ip_name }} -n metallb-system --ignore-not-found
             success_msg: "No stale LB Service, proceeding with create"
 
         - name: Create PublicIP via metallb_l2 role
@@ -232,7 +246,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: lb_svc_result
 
@@ -245,7 +259,7 @@
               - lb_svc_result.resources[0].spec.ports[0].name == "placeholder"
               - lb_svc_result.resources[0].spec.selector | default({}) | length == 0
             fail_msg: "LoadBalancer Service not created correctly"
-            success_msg: "LoadBalancer Service 'osac-publicip-{{ test_ip_name }}' created with correct spec"
+            success_msg: "LoadBalancer Service 'osac-pip-{{ test_ip_name }}' created with correct spec"
 
         - name: Verify LoadBalancer Service annotations
           ansible.builtin.assert:
@@ -278,7 +292,7 @@
           kubernetes.core.k8s:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
             state: absent
           when: ansible_failed_result is defined
@@ -295,8 +309,7 @@
     K8S_AUTH_IMPERSONATE_USER: "{{ test_impersonate_user | default('') }}"
 
   vars:
-    test_ip_name: "test-publicip"
-    public_ip_name: "{{ test_ip_name }}"
+    test_ip_name: "test-publicip-id"
     public_ip:
       metadata:
         name: "{{ test_ip_name }}"
@@ -309,7 +322,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: pre_delete_svc
 
@@ -329,7 +342,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: svc_after_delete
 
@@ -338,7 +351,7 @@
             that:
               - svc_after_delete.resources | length == 0
             fail_msg: "LB Service still exists after delete"
-            success_msg: "LB Service 'osac-publicip-{{ test_ip_name }}' successfully deleted"
+            success_msg: "LB Service 'osac-pip-{{ test_ip_name }}' successfully deleted"
 
 # ──────────────────────────────────────────────────────────────
 # Test: Delete PublicIP when already gone (NotFound handling)
@@ -352,7 +365,6 @@
 
   vars:
     test_ip_name: "test-publicip"
-    public_ip_name: "{{ test_ip_name }}"
     public_ip:
       metadata:
         name: "{{ test_ip_name }}"
@@ -365,7 +377,7 @@
           kubernetes.core.k8s_info:
             api_version: v1
             kind: Service
-            name: "osac-publicip-{{ test_ip_name }}"
+            name: "osac-pip-{{ test_ip_name }}"
             namespace: metallb-system
           register: pre_notfound_svc
 
@@ -518,3 +530,405 @@
         - name: Confirm no failure occurred
           ansible.builtin.debug:
             msg: "Delete-not-found test passed: role tolerated already-deleted resources"
+
+# ──────────────────────────────────────────────────────────────
+# Test: Attach PublicIP to a ComputeInstance
+# Expected:
+#   - Parking Service deleted from metallb-system
+#   - LoadBalancer Service created in VM namespace with correct
+#     selector, labels, annotations, and the reserved IP
+#   - ComputeInstance annotated with floating-ip-address
+# Prerequisites:
+#   - IPAddressPool exists (run pool create first or run all tests)
+#   - ComputeInstance CRD installed (osac.openshift.io/v1alpha1)
+# ──────────────────────────────────────────────────────────────
+- name: Test metallb_l2 role -- attach PublicIP to ComputeInstance
+  hosts: localhost
+  gather_facts: false
+  environment:
+    K8S_AUTH_IMPERSONATE_USER: "{{ test_impersonate_user | default('') }}"
+
+  vars:
+    test_ip_name: "test-publicip-id"
+    test_pool_name: "test-metallb-pool"
+    test_vm_namespace: "test-publicip-vm-ns"
+    test_ci_name: "test-compute-instance"
+    test_ci_namespace: "default"
+    test_ci_uuid: "a1b2c3d4-0000-0000-0000-test-ci-uuid"
+    public_ip:
+      metadata:
+        name: "{{ test_ip_name }}"
+        namespace: "{{ test_ci_namespace }}"
+        annotations:
+          osac.openshift.io/publicippool-name: "{{ test_pool_name }}"
+          osac.openshift.io/publicip-target-namespace: "{{ test_vm_namespace }}"
+      spec:
+        computeInstance: "{{ test_ci_uuid }}"
+
+  tasks:
+    - name: Run attach tests
+      when: run_attach | default(true) | bool
+      block:
+        - name: Create VM target namespace
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: "{{ test_vm_namespace }}"
+
+        - name: Create ComputeInstance fixture CR
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: osac.openshift.io/v1alpha1
+              kind: ComputeInstance
+              metadata:
+                name: "{{ test_ci_name }}"
+                namespace: "{{ test_ci_namespace }}"
+                labels:
+                  osac.openshift.io/computeinstance-uuid: "{{ test_ci_uuid }}"
+              spec:
+                templateID: osac.templates.ocp_virt_vm
+                cores: 2
+                memoryGiB: 4
+                bootDisk:
+                  sizeGiB: 20
+                image:
+                  sourceType: registry
+                  sourceRef: "quay.io/containerdisks/fedora:latest"
+                runStrategy: "Always"
+
+        - name: Create parking Service in metallb-system (simulate pre-existing PublicIP)
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: "osac-pip-{{ test_ip_name }}"
+                namespace: metallb-system
+                annotations:
+                  metallb.universe.tf/address-pool: "{{ test_pool_name }}"
+                labels:
+                  osac.openshift.io/publicip: "{{ test_ip_name }}"
+                  osac.io/managed-by: osac-fulfillment
+              spec:
+                type: LoadBalancer
+                selector: {}
+                ports:
+                  - name: placeholder
+                    protocol: TCP
+                    port: 65535
+                    targetPort: 65535
+          register: parking_svc_create
+          retries: 60
+          delay: 10
+          until: parking_svc_create is successful
+
+        - name: Wait for MetalLB to assign IP to parking Service
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Service
+            name: "osac-pip-{{ test_ip_name }}"
+            namespace: metallb-system
+          register: parking_svc_info
+          retries: 60
+          delay: 10
+          until: >-
+            parking_svc_info.resources | length > 0 and
+            parking_svc_info.resources[0].status.loadBalancer.ingress | default([]) | length > 0
+
+        - name: Record IP assigned to parking Service
+          ansible.builtin.set_fact:
+            pre_attach_ip: "{{ parking_svc_info.resources[0].status.loadBalancer.ingress[0].ip }}"
+
+        - name: Assert clean state -- LB Service not yet in VM namespace
+          block:
+            - name: Check LB Service absent from VM namespace before attach
+              kubernetes.core.k8s_info:
+                api_version: v1
+                kind: Service
+                name: "osac-pip-{{ test_ip_name }}-ingress"
+                namespace: "{{ test_vm_namespace }}"
+              register: pre_attach_lb_svc
+
+            - name: Assert LB Service not in VM namespace
+              ansible.builtin.assert:
+                that:
+                  - pre_attach_lb_svc.resources | length == 0
+                fail_msg: >-
+                  Stale LB Service 'osac-pip-{{ test_ip_name }}-ingress' already exists in '{{ test_vm_namespace }}'.
+                  Clean up with: oc delete svc osac-pip-{{ test_ip_name }}-ingress -n {{ test_vm_namespace }} --ignore-not-found
+                success_msg: "No stale LB Service in VM namespace, proceeding with attach"
+
+        - name: Run attach_public_ip role
+          ansible.builtin.include_role:
+            name: osac.templates.metallb_l2
+            tasks_from: attach_public_ip
+
+        - name: Verify parking Service deleted from metallb-system
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Service
+            name: "osac-pip-{{ test_ip_name }}"
+            namespace: metallb-system
+          register: parking_svc_after_attach
+
+        - name: Assert parking Service is gone
+          ansible.builtin.assert:
+            that:
+              - parking_svc_after_attach.resources | length == 0
+            fail_msg: "Parking Service still exists in metallb-system after attach"
+            success_msg: "Parking Service 'osac-pip-{{ test_ip_name }}' correctly removed from metallb-system"
+
+        - name: Fetch LoadBalancer Service in VM namespace
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Service
+            name: "osac-pip-{{ test_ip_name }}-ingress"
+            namespace: "{{ test_vm_namespace }}"
+          register: lb_svc_result
+
+        - name: Verify LB Service created in VM namespace with correct type
+          ansible.builtin.assert:
+            that:
+              - lb_svc_result.resources | length == 1
+              - lb_svc_result.resources[0].spec.type == "LoadBalancer"
+            fail_msg: "LB Service not created in VM namespace after attach"
+            success_msg: "LB Service 'osac-pip-{{ test_ip_name }}-ingress' created in '{{ test_vm_namespace }}'"
+
+        - name: Verify LB Service annotations preserve pool and IP
+          ansible.builtin.assert:
+            that:
+              - lb_svc_result.resources[0].metadata.annotations['metallb.universe.tf/address-pool'] == test_pool_name
+              - lb_svc_result.resources[0].metadata.annotations['metallb.universe.tf/loadBalancerIPs'] == pre_attach_ip
+            fail_msg: "LB Service annotations (pool or IP) incorrect after attach"
+            success_msg: "LB Service annotations correct: pool='{{ test_pool_name }}' ip='{{ pre_attach_ip }}'"
+
+        - name: Verify LB Service labels
+          ansible.builtin.assert:
+            that:
+              - lb_svc_result.resources[0].metadata.labels['osac.openshift.io/publicip'] == test_ip_name
+              - lb_svc_result.resources[0].metadata.labels['osac.io/managed-by'] == 'osac-fulfillment'
+            fail_msg: "LB Service labels incorrect after attach"
+            success_msg: "LB Service labels correct"
+
+        - name: Verify LB Service VM selector
+          ansible.builtin.assert:
+            that:
+              - lb_svc_result.resources[0].spec.selector['vm.kubevirt.io/name'] == test_ci_name
+            fail_msg: "LB Service selector does not target the correct VM"
+            success_msg: "LB Service selector targets VM '{{ test_ci_name }}'"
+
+        - name: Fetch ComputeInstance to verify annotation
+          kubernetes.core.k8s_info:
+            api_version: osac.openshift.io/v1alpha1
+            kind: ComputeInstance
+            name: "{{ test_ci_name }}"
+            namespace: "{{ test_ci_namespace }}"
+          register: ci_after_attach
+
+        - name: Verify ComputeInstance annotated with floating-ip-address
+          ansible.builtin.assert:
+            that:
+              - ci_after_attach.resources | length == 1
+              - (ci_after_attach.resources[0].metadata.annotations | default({}))['osac.openshift.io/floating-ip-address'] == pre_attach_ip
+            fail_msg: "ComputeInstance not annotated with floating-ip-address after attach"
+            success_msg: >-
+              ComputeInstance '{{ test_ci_name }}' annotated with
+              floating-ip-address='{{ pre_attach_ip }}'
+
+      always:
+        - name: Clean up LB Service from VM namespace on failure
+          kubernetes.core.k8s:
+            api_version: v1
+            kind: Service
+            name: "osac-pip-{{ test_ip_name }}-ingress"
+            namespace: "{{ test_vm_namespace }}"
+            state: absent
+          when: ansible_failed_result is defined
+          ignore_errors: true
+
+        - name: Clean up parking Service from metallb-system on failure
+          kubernetes.core.k8s:
+            api_version: v1
+            kind: Service
+            name: "osac-pip-{{ test_ip_name }}"
+            namespace: metallb-system
+            state: absent
+          when: ansible_failed_result is defined
+          ignore_errors: true
+
+        - name: Clean up ComputeInstance fixture on failure
+          kubernetes.core.k8s:
+            api_version: osac.openshift.io/v1alpha1
+            kind: ComputeInstance
+            name: "{{ test_ci_name }}"
+            namespace: "{{ test_ci_namespace }}"
+            state: absent
+          when: ansible_failed_result is defined
+          ignore_errors: true
+
+# ──────────────────────────────────────────────────────────────
+# Test: Detach PublicIP from a ComputeInstance
+# Expected:
+#   - LoadBalancer Service removed from VM namespace
+#   - floating-ip-address annotation removed from ComputeInstance
+#   - Parking Service re-created in metallb-system with the same IP
+# Prerequisites:
+#   - attach test must have run (or LB Service + annotated ComputeInstance
+#     must exist in the test VM namespace)
+# ──────────────────────────────────────────────────────────────
+- name: Test metallb_l2 role -- detach PublicIP from ComputeInstance
+  hosts: localhost
+  gather_facts: false
+  environment:
+    K8S_AUTH_IMPERSONATE_USER: "{{ test_impersonate_user | default('') }}"
+
+  vars:
+    test_ip_name: "test-publicip-id"
+    test_pool_name: "test-metallb-pool"
+    test_vm_namespace: "test-publicip-vm-ns"
+    test_ci_name: "test-compute-instance"
+    test_ci_namespace: "default"
+    test_ci_uuid: "a1b2c3d4-0000-0000-0000-test-ci-uuid"
+    public_ip:
+      metadata:
+        name: "{{ test_ip_name }}"
+        namespace: "{{ test_ci_namespace }}"
+        annotations:
+          osac.openshift.io/publicippool-name: "{{ test_pool_name }}"
+          osac.openshift.io/publicip-target-namespace: "{{ test_vm_namespace }}"
+      spec:
+        computeInstance: "{{ test_ci_uuid }}"
+
+  tasks:
+    - name: Run detach tests
+      when: run_detach | default(true) | bool
+      block:
+        - name: Verify LB Service exists in VM namespace before detach
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Service
+            name: "osac-pip-{{ test_ip_name }}-ingress"
+            namespace: "{{ test_vm_namespace }}"
+          register: pre_detach_lb_svc
+
+        - name: Assert LB Service exists (otherwise detach test is meaningless)
+          ansible.builtin.assert:
+            that:
+              - pre_detach_lb_svc.resources | length == 1
+              - pre_detach_lb_svc.resources[0].status.loadBalancer.ingress | default([]) | length > 0
+            fail_msg: >-
+              LB Service 'osac-pip-{{ test_ip_name }}-ingress' not found in '{{ test_vm_namespace }}' or has no IP.
+              Run the attach test first or run all tests together.
+            success_msg: "LB Service exists with IP, proceeding with detach"
+
+        - name: Record IP held by LB Service
+          ansible.builtin.set_fact:
+            pre_detach_ip: "{{ pre_detach_lb_svc.resources[0].status.loadBalancer.ingress[0].ip }}"
+
+        - name: Run detach_public_ip role
+          ansible.builtin.include_role:
+            name: osac.templates.metallb_l2
+            tasks_from: detach_public_ip
+
+        - name: Verify LB Service deleted from VM namespace
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Service
+            name: "osac-pip-{{ test_ip_name }}-ingress"
+            namespace: "{{ test_vm_namespace }}"
+          register: lb_svc_after_detach
+
+        - name: Assert LB Service is gone from VM namespace
+          ansible.builtin.assert:
+            that:
+              - lb_svc_after_detach.resources | length == 0
+            fail_msg: "LB Service still exists in VM namespace after detach"
+            success_msg: "LB Service 'osac-pip-{{ test_ip_name }}-ingress' correctly removed from '{{ test_vm_namespace }}'"
+
+        - name: Fetch ComputeInstance to verify annotation removed
+          kubernetes.core.k8s_info:
+            api_version: osac.openshift.io/v1alpha1
+            kind: ComputeInstance
+            name: "{{ test_ci_name }}"
+            namespace: "{{ test_ci_namespace }}"
+          register: ci_after_detach
+
+        - name: Assert floating-ip-address annotation removed from ComputeInstance
+          ansible.builtin.assert:
+            that:
+              - ci_after_detach.resources | length == 1
+              - >-
+                (ci_after_detach.resources[0].metadata.annotations | default({}))
+                ['osac.openshift.io/floating-ip-address'] is not defined
+            fail_msg: "floating-ip-address annotation still present on ComputeInstance after detach"
+            success_msg: "floating-ip-address annotation correctly removed from ComputeInstance '{{ test_ci_name }}'"
+
+        - name: Wait for parking Service to be re-created in metallb-system
+          kubernetes.core.k8s_info:
+            api_version: v1
+            kind: Service
+            name: "osac-pip-{{ test_ip_name }}"
+            namespace: metallb-system
+          register: parking_svc_after_detach
+          retries: 60
+          delay: 10
+          until: >-
+            parking_svc_after_detach.resources | length > 0 and
+            parking_svc_after_detach.resources[0].status.loadBalancer.ingress | default([]) | length > 0
+
+        - name: Verify parking Service spec is a placeholder (empty selector)
+          ansible.builtin.assert:
+            that:
+              - parking_svc_after_detach.resources[0].spec.type == "LoadBalancer"
+              - parking_svc_after_detach.resources[0].spec.selector | default({}) | length == 0
+            fail_msg: "Re-created parking Service has incorrect spec after detach"
+            success_msg: "Parking Service 'osac-pip-{{ test_ip_name }}' re-created with correct placeholder spec"
+
+        - name: Verify parking Service preserves the same IP
+          ansible.builtin.assert:
+            that:
+              - parking_svc_after_detach.resources[0].status.loadBalancer.ingress[0].ip == pre_detach_ip
+            fail_msg: >-
+              Parking Service IP '{{ parking_svc_after_detach.resources[0].status.loadBalancer.ingress[0].ip }}'
+              does not match the original IP '{{ pre_detach_ip }}'
+            success_msg: "Parking Service correctly preserved IP '{{ pre_detach_ip }}'"
+
+        - name: Verify parking Service labels
+          ansible.builtin.assert:
+            that:
+              - parking_svc_after_detach.resources[0].metadata.labels['osac.openshift.io/publicip'] == test_ip_name
+              - parking_svc_after_detach.resources[0].metadata.labels['osac.io/managed-by'] == 'osac-fulfillment'
+            fail_msg: "Re-created parking Service labels incorrect after detach"
+            success_msg: "Parking Service labels correct"
+
+      always:
+        - name: Clean up parking Service from metallb-system
+          kubernetes.core.k8s:
+            api_version: v1
+            kind: Service
+            name: "osac-pip-{{ test_ip_name }}"
+            namespace: metallb-system
+            state: absent
+          ignore_errors: true
+
+        - name: Clean up ComputeInstance fixture
+          kubernetes.core.k8s:
+            api_version: osac.openshift.io/v1alpha1
+            kind: ComputeInstance
+            name: "{{ test_ci_name }}"
+            namespace: "{{ test_ci_namespace }}"
+            state: absent
+          ignore_errors: true
+
+        - name: Clean up VM target namespace
+          kubernetes.core.k8s:
+            api_version: v1
+            kind: Namespace
+            name: "{{ test_vm_namespace }}"
+            state: absent
+          ignore_errors: true
