@@ -243,6 +243,30 @@ controller_templates: # noqa: var-naming[no-role-prefix]
     allow_simultaneous: true
     ask_variables_on_launch: true
     verbosity: 0
+  - name: "{{ aap_prefix }}-create-security-group"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_create_security_group.yml"
+    inventory: "{{ aap_prefix }}-networking-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-networking-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
+  - name: "{{ aap_prefix }}-delete-security-group"
+    project: "{{ aap_prefix }}"
+    organization: "{{ aap_organization_name }}"
+    job_type: run
+    playbook: "playbook_osac_delete_security_group.yml"
+    inventory: "{{ aap_prefix }}-networking-operations"
+    execution_environment: "{{ aap_prefix }}-ee"
+    instance_groups:
+      - "{{ aap_prefix }}-networking-operations-ig"
+    allow_simultaneous: true
+    ask_variables_on_launch: true
+    verbosity: 0
   - name: "{{ aap_prefix }}-import-agents"
     project: "{{ aap_prefix }}"
     organization: "{{ aap_organization_name }}"
@@ -663,4 +687,4 @@ controller_instance_groups: # noqa: var-naming[no-role-prefix]
 
   - name: "{{ aap_prefix }}-networking-operations-ig"
     is_container_group: true
-    pod_spec_override: "{{ lookup('ansible.builtin.template', 'compute-instance-operations-ig.j2') }}"
+    pod_spec_override: "{{ lookup('ansible.builtin.template', 'networking-operations-ig.j2') }}"
