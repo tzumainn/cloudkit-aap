@@ -1,2 +1,2 @@
 ---
-vpc_state: absent
+vpc_state: present

@@ -28,6 +28,18 @@
     method: DELETE
     headers:
       Cookie: "connect.sid={{ netris_session_cookie }}"
-    status_code: [200, 204]
+    return_content: true
+    status_code: [200, 204, 400]
     validate_certs: "{{ netris_validate_certs | default(true) }}"
+  register: _vpc_delete_resp
   no_log: true
+
+- name: Fail if VPC deletion returned an error
+  when:
+    - _vpc_delete_resp is defined
+    - _vpc_delete_resp.status | default(200) == 400
+  ansible.builtin.fail:
+    msg: >-
+      Failed to delete VPC '{{ vpc_name }}' (ID: {{ _existing_vpc.id }}).
+      Netris responded with: {{ _vpc_delete_resp.json.message | default(_vpc_delete_resp.content | default('unknown error')) }}.
+      This usually means the VPC still has dependent resources (V-Nets, IPAM allocations, etc.).

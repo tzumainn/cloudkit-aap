@@ -85,18 +85,90 @@ Create or delete L4 load balancers.
 
 See `meta/argument_specs.yaml` for the full variable list.
 
-### ipam
+### vpc
 
-Query the Netris IPAM for available IPs by subnet purpose.
+Create or delete a Netris VPC (Virtual Private Cloud / VRF).
 
-**State variable:** `ipam_state` (default: `read`)
+**State variable:** `vpc_state` (`present` | `absent`)
 
 **Variables:**
-- `ipam_site_id` (required) — Netris site ID to filter subnets by
+- `vpc_name` (required) — Name of the VPC
+- `vpc_tenant_id` (required for create) — Admin tenant ID
+
+**Output:** `vpc_id`, `vpc_already_existed`
+
+**API:** `POST /api/v2/vpc` (create), `DELETE /api/v2/vpc/{id}` (delete)
+
+### vnet
+
+Create or delete a Netris V-Net (virtual network segment within a VPC).
+
+**State variable:** `vnet_state` (`present` | `absent`)
+
+**Variables:**
+- `vnet_name` (required) — Name of the V-Net
+- `vnet_vpc_id` (required for create) — Parent VPC ID
+- `vnet_site_id` (required for create) — Netris site ID
+- `vnet_tenant_id` — Owner tenant ID
+- `vnet_gateway` — Gateway CIDR (e.g. `10.0.1.1/24`), enables L3 routing
+- `vnet_vlan_id` — VLAN ID (integer, required by API)
+- `vnet_ports` — Switch ports to attach
+
+**Output:** `vnet_id`, `vnet_already_existed`
+
+**API:** `POST /api/v2/vnet` (create), `DELETE /api/v2/vnet/{id}` (delete). Uses `tenant` (singular object), `vlan` (integer).
+
+### acl
+
+Create or delete Netris ACL (Access Control List) firewall rules.
+
+**State variable:** `acl_state` (`present` | `absent`)
+
+**Variables:**
+- `acl_name` (required) — Name of the ACL rule
+- `acl_action` (default: `permit`) — `permit` or `deny`
+- `acl_proto` (default: `all`) — Protocol: `all`, `tcp`, `udp`, `icmp`, `ip`, `icmpv6`
+- `acl_vpc_id` (default: `1`) — VPC ID for the rule
+- `acl_src_prefix` — Source prefix in CIDR notation
+- `acl_dst_prefix` — Destination prefix in CIDR notation
+- `acl_src_port_from` / `acl_src_port_to` — Source port range
+- `acl_dst_port_from` / `acl_dst_port_to` — Destination port range
+- `acl_src_port_group` / `acl_dst_port_group` — Port group IDs (0 for none)
+- `acl_established` — Match established connections (0 or 1)
+- `acl_reverse` — Generate reverse rule (`yes` / `no`)
+- `acl_comment` — Comment
+
+**Output:** `acl_id`, `acl_already_existed`
+
+**API:** `POST /api/acl` (create, v1 API), `DELETE /api/acl` with `{"id": [<id>]}` (delete). Field names use snake_case: `proto`, `src_prefix`, `dst_prefix`, `src_port_from`, etc.
+
+### ipam
+
+Query, create, or delete Netris IPAM allocations and subnets.
+
+**State variable:** `ipam_state` (`read` | `create` | `delete`, default: `read`)
+
+**Read variables:**
+- `ipam_site_id` — Netris site ID to filter subnets by
 - `ipam_purpose` (default: `nat`) — Subnet purpose to filter by (e.g. `nat`, `load-balancer`)
 - `ipam_count` (default: `1`) — Number of IPs to allocate
 
-**Output:** `ipam_allocated_ips` (list of allocated IP addresses)
+**Read output:** `ipam_allocated_ips` (list of allocated IP addresses)
+
+**Create variables:**
+- `ipam_name` (required) — Name for the IPAM subnet
+- `ipam_cidr` (required) — CIDR block
+- `ipam_purpose` (required) — Subnet purpose: `common`, `load-balancer`, `nat`, `inactive`
+- `ipam_site_id` (required) — Netris site ID
+- `ipam_tenant_id` — Owner tenant ID
+- `ipam_vpc_id` — VPC to assign the subnet to
+
+**Create output:** `ipam_subnet_id`, `ipam_alloc_id`, `ipam_already_existed`
+
+**Delete variables:**
+- `ipam_name` (required) — Name of the IPAM subnet to delete (also deletes the `<name>-alloc` allocation)
+
+**API:** Create is two-step: `POST /api/v2/ipam/allocation` (parent), then `POST /api/v2/ipam/subnet` (child). Delete: `DELETE /api/v2/ipam/subnet/{id}`, then `DELETE /api/v2/ipam/allocation/{id}`.
 
 ## Common Variables
 

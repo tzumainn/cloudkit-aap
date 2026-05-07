@@ -49,9 +49,10 @@ osac.service.external_access
 
 | Collection | Purpose |
 |------------|---------|
-| `netris.controller` | Low-level Netris API roles: `auth`, `server_cluster`, `server_cluster_template`, `nat`, `ipam`, `l4lb`, `vpc` |
+| `netris.controller` | Low-level Netris API roles: `auth`, `server_cluster`, `server_cluster_template`, `nat`, `ipam`, `l4lb`, `vpc`, `vnet`, `acl` |
 | `netris.steps` | High-level orchestration: `cluster_infra` and `external_access` roles that compose `netris.controller` roles |
 | `osac.service` | Generic service roles that delegate to `netris.steps` |
+| `osac.templates` | Template roles including `netris` (Netris network class for OSAC networking API) |
 
 ### Template Integration
 
@@ -306,3 +307,32 @@ All Netris resources created by the playbooks follow this naming convention:
 | Ingress HTTP DNAT | `<cluster-name>-ingress-http-dnat` |
 | Ingress HTTPS DNAT | `<cluster-name>-ingress-https-dnat` |
 | DNS records | `api.<cluster-name>.<domain>`, `api-int.<cluster-name>.<domain>`, `*.apps.<cluster-name>.<domain>` |
+
+## Netris Network Class (`netris`)
+
+In addition to the CaaS cluster networking above, the `netris` network class
+implements the OSAC Networking API by translating its resources into Netris
+primitives:
+
+| OSAC Resource | Netris Primitive | API |
+|---------------|-----------------|-----|
+| VirtualNetwork | VPC + V-Net | `POST /api/v2/vpc`, `POST /api/v2/vnet` |
+| Subnet | IPAM allocation + subnet | `POST /api/v2/ipam/allocation`, `POST /api/v2/ipam/subnet` |
+| SecurityGroup | ACL rules | `POST /api/acl` (v1 API) |
+| PublicIPPool | IPAM allocation + subnet (purpose=nat) | `POST /api/v2/ipam/allocation`, `POST /api/v2/ipam/subnet` |
+| PublicIP | IPAM IP allocation | Read from existing IPAM pool |
+
+The template role is at `collections/ansible_collections/osac/templates/roles/netris/`.
+It is auto-discovered by the `publish_templates` playbook via `meta/osac.yaml`
+and registered as a NetworkClass in the fulfillment service.
+
+### Networking Instance Group
+
+The networking operations jobs run on the `networking-operations-ig` instance
+group, which mounts the `network-fulfillment-ig` ConfigMap and Secret for Netris
+credentials:
+
+| Resource | Keys |
+|----------|------|
+| ConfigMap `network-fulfillment-ig` | `NETRIS_CONTROLLER_URL`, `NETRIS_USERNAME`, `NETRIS_SITE_ID`, `NETRIS_TENANT_ID`, `NETRIS_TENANT_NAME` |
+| Secret `network-fulfillment-ig` | `NETRIS_PASSWORD` |
