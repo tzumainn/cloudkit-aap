@@ -15,12 +15,9 @@
       - public_ip.metadata.annotations is defined
       - "'osac.openshift.io/publicippool-name' in public_ip.metadata.annotations"
       - "'osac.openshift.io/publicip-target-namespace' in public_ip.metadata.annotations"
-      - public_ip.spec is defined
-      - public_ip.spec.computeInstance is defined
-      - public_ip.spec.computeInstance | length > 0
     fail_msg: >-
       PublicIP is missing required fields/annotations:
-      metadata.name, metadata.namespace, and spec.computeInstance must be set,
+      metadata.name and metadata.namespace must be set,
       and annotations osac.openshift.io/publicippool-name and
       osac.openshift.io/publicip-target-namespace must both be present.
 
@@ -31,6 +28,8 @@
       {{ public_ip.metadata.annotations['osac.openshift.io/publicip-target-namespace'] }}
     detach_pool_name: >-
       {{ public_ip.metadata.annotations['osac.openshift.io/publicippool-name'] }}
+    detach_compute_instance_uuid: >-
+      {{ ((public_ip.spec | default({})).computeInstance | default('')) | trim }}
 
 - name: Fetch ComputeInstance CR
   kubernetes.core.k8s_info:
@@ -39,19 +38,16 @@
     kind: ComputeInstance
     namespace: "{{ public_ip.metadata.namespace }}"
     label_selectors:
-      - "osac.openshift.io/computeinstance-uuid={{ public_ip.spec.computeInstance }}"
+      - "osac.openshift.io/computeinstance-uuid={{ detach_compute_instance_uuid }}"
   register: detach_ci_lookup
-
-- name: Fail if ComputeInstance not found
-  ansible.builtin.fail:
-    msg: >-
-      ComputeInstance with uuid '{{ public_ip.spec.computeInstance }}' not found
-      in namespace '{{ public_ip.metadata.namespace }}'.
-  when: detach_ci_lookup.resources | length == 0
+  when: detach_compute_instance_uuid | length > 0
 
 - name: Extract ComputeInstance name from fetched CR
   ansible.builtin.set_fact:
     detach_compute_instance_name: "{{ detach_ci_lookup.resources[0].metadata.name }}"
+  when:
+    - detach_ci_lookup is not skipped
+    - detach_ci_lookup.resources | default([]) | length > 0
 
 # Read the IP from the VM namespace LB Service before deleting it.
 - name: Read IP from VM namespace LoadBalancer Service
@@ -72,9 +68,18 @@
     lb_service_info.resources | length == 0 or
     lb_service_info.resources[0].status.loadBalancer.ingress | default([]) | length == 0
 
-- name: Extract IP address from VM namespace LB Service
+- name: Extract IP address and VM name from VM namespace LB Service
   ansible.builtin.set_fact:
     detach_ip_address: "{{ lb_service_info.resources[0].status.loadBalancer.ingress[0].ip }}"
+    detach_vm_name_from_svc: >-
+      {{ (lb_service_info.resources[0].spec.selector | default({}))['vm.kubevirt.io/name'] | default('') }}
+
+- name: Set ComputeInstance name from LB Service selector if not already known
+  ansible.builtin.set_fact:
+    detach_compute_instance_name: "{{ detach_vm_name_from_svc }}"
+  when:
+    - detach_compute_instance_name is not defined
+    - detach_vm_name_from_svc | length > 0
 
 - name: Display PublicIP detach information
   ansible.builtin.debug:
@@ -83,7 +88,7 @@
       - "IP address: {{ detach_ip_address }} (read from VM namespace LB Service)"
       - "Pool: {{ detach_pool_name }}"
       - "VM namespace: {{ detach_vm_namespace }}"
-      - "ComputeInstance: {{ detach_compute_instance_name }} ({{ public_ip.metadata.namespace }})"
+      - "ComputeInstance: {{ detach_compute_instance_name | default('not available') }}"
 
 # Delete the LB Service, clear the annotation, and restore the placeholder atomically.
 # The rescue restores the LB Service if placeholder re-creation fails so the IP
@@ -178,7 +183,9 @@
                 port: 22
                 targetPort: 22
                 protocol: TCP
-      when: lb_service_delete_result.changed | default(false)
+      when:
+        - lb_service_delete_result.changed | default(false)
+        - detach_compute_instance_name is defined
       register: rescue_lb_result
       retries: 3
       delay: 5
@@ -200,6 +207,7 @@
     name: "{{ detach_compute_instance_name }}"
     namespace: "{{ public_ip.metadata.namespace }}"
   register: ci_info
+  when: detach_compute_instance_name is defined
 
 - name: Remove public-ip-address annotation from ComputeInstance CR
   kubernetes.core.k8s_json_patch:
@@ -212,21 +220,26 @@
       - op: remove
         path: /metadata/annotations/osac.openshift.io~1public-ip-address
   register: ci_patch_result
-  when: >-
-    ci_info.resources | length > 0 and
-    (ci_info.resources[0].metadata.annotations | default({}))
-    ['osac.openshift.io/public-ip-address'] is defined
+  when:
+    - detach_compute_instance_name is defined
+    - ci_info is not skipped
+    - ci_info.resources | length > 0
+    - (ci_info.resources[0].metadata.annotations | default({}))
+      ['osac.openshift.io/public-ip-address'] is defined
 
 - name: Display ComputeInstance annotation removal result
   ansible.builtin.debug:
     msg:
       - "ComputeInstance '{{ detach_compute_instance_name }}': public-ip-address annotation removed"
       - "Changed: {{ ci_patch_result.changed | default(false) }}"
-  when: ci_patch_result is defined and ci_patch_result is not skipped
+  when:
+    - detach_compute_instance_name is defined
+    - ci_patch_result is defined
+    - ci_patch_result is not skipped
 
-- name: Display ComputeInstance annotation already absent
+- name: Display ComputeInstance annotation cleanup skipped
   ansible.builtin.debug:
     msg: >-
-      ComputeInstance '{{ detach_compute_instance_name }}':
-      public-ip-address annotation not present, nothing to remove
-  when: ci_patch_result is defined and ci_patch_result is skipped
+      ComputeInstance annotation cleanup skipped
+      (spec.computeInstance was not available during detach)
+  when: detach_compute_instance_name is not defined
