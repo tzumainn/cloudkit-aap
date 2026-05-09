@@ -29,7 +29,7 @@
     detach_pool_name: >-
       {{ public_ip.metadata.annotations['osac.openshift.io/publicippool-name'] }}
     detach_compute_instance_uuid: >-
-      {{ (public_ip.spec.computeInstance | default('')) | trim }}
+      {{ ((public_ip.spec | default({})).computeInstance | default('')) | trim }}
 
 - name: Fetch ComputeInstance CR
   kubernetes.core.k8s_info:
