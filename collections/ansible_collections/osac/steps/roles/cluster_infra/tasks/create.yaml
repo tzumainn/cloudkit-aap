@@ -14,6 +14,9 @@
 # For now, we create the BareMetalPool in the POD_NAMESPACE, but
 # in the future, we hope to have it created in the cluster_working_namespace.
 # This requires updates to the bare-metal-fulfillment-operator
+# Note: Network creation and host attachment to the network are now handled
+# automatically by the BareMetalPool controller via bm_private_network and
+# bm_host_private_network template roles
 
 - name: Step - Create BareMetalPool
   kubernetes.core.k8s:
@@ -27,26 +30,19 @@
         labels: "{{ {cluster_order_label: cluster_infra_name} }}"
       spec:
         hostSets: "{{ baremetalpool_host_sets }}"
+        profile:
+          name: agent_private_network
+          templateParameters: |
+            {
+              "privateNetwork": "network-{{ cluster_infra_name }}",
+              "networkAfterDelete": "idle-agents-network"
+            }
+        networkClass: openstack
   register: baremetalpool_response
 
 - name: Set BareMetalPool UID
   ansible.builtin.set_fact:
     baremetalpool_uid: "{{ baremetalpool_response.result.metadata.uid }}"
-
-- name: Create cluster network
-  ansible.builtin.include_role:
-    name: osac.esi.network
-  vars:
-    network_suffix: "{{ cluster_infra_name }}"
-    network_state: present
-    network_properties:
-      instance: "{{ cluster_order.metadata.namespace }}"
-      clusterorder: "{{ cluster_infra_name }}"
-      purpose: "o-sac"
-
-- name: Set cluster_infra_network_name
-  ansible.builtin.set_fact:
-    cluster_infra_network_name: "network-{{ cluster_infra_name }}"
 
 - name: Calculate total desired nodes
   ansible.builtin.set_fact:
@@ -67,6 +63,7 @@
       selectattr('controller', 'defined') |
       selectattr('controller', 'equalto', true) |
       selectattr('uid', 'equalto', baremetalpool_uid) |
+      selectattr('spec.externalHostID', 'ne', '') |
       list | length
     ) == (total_desired_nodes | int)
   retries: 60
@@ -89,26 +86,6 @@
 - name: Display allocated host IDs
   ansible.builtin.debug:
     msg: "Allocated host IDs: {{ allocated_host_ids }}"
-
-# Handle scale down **before** scale up: detach agents not in the
-# HostLease allocation before attaching new ones.
-
-- name: Wait for the Agents to be removed from the cluster
-  ansible.builtin.include_role:
-    name: osac.service.manage_agents
-    tasks_from: wait_for_agents_to_be_removed
-  vars:
-    manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
-    manage_agents_desired_count: "{{ item.replicas }}"
-    manage_agents_resource_class: "{{ item.hostType }}"
-  loop: "{{ baremetalpool_host_sets }}"
-
-- name: Detach agents from cluster
-  ansible.builtin.include_role:
-    name: osac.service.manage_agents
-    tasks_from: detach_and_unlabel_all_removed_agents
-  vars:
-    manage_agents_cluster_order_name: "{{ cluster_infra_name }}"
 
 - name: Get all agents in the namespace
   kubernetes.core.k8s_info:
@@ -139,25 +116,52 @@
       {{ allocated_host_ids | length }} leased hosts.
   when: (agents_to_attach | length) != (allocated_host_ids | length)
 
-- name: Display hosts to attach to cluster network
+- name: Initialize agents to detach list
+  ansible.builtin.set_fact:
+    agents_to_detach: []
+
+- name: Select agents with cluster order label NOT in allocated host IDs
+  ansible.builtin.set_fact:
+    agents_to_detach: "{{ agents_to_detach + [item] }}"
+  loop: "{{ all_agents_result.resources }}"
+  when:
+    - item.metadata.labels is defined
+    - item.metadata.labels[cluster_order_label] is defined
+    - item.metadata.labels[cluster_order_label] == cluster_infra_name
+    - item.metadata.annotations is defined
+    - item.metadata.annotations['osac.openshift.io/host_uuid'] is defined
+    - item.metadata.annotations['osac.openshift.io/host_uuid'] not in allocated_host_ids
+  loop_control:
+    label: "Selected agent {{ item.metadata.name }} for label removal"
+
+- name: Display hosts allocated
   ansible.builtin.debug:
-    msg: "Hosts to attach: {{ allocated_host_ids }}"
+    msg: "Hosts allocated: {{ allocated_host_ids }}"
+
+- name: Display agents to unlabel
+  ansible.builtin.debug:
+    msg: "Agents to unlabel: {{ agents_to_detach | map(attribute='metadata.name') | list }}"
 
 - name: Display agents to label
   ansible.builtin.debug:
     msg: "Agents to label: {{ agents_to_attach | map(attribute='metadata.name') | list }}"
 
-- name: Attach new agents's hosts to cluster network
-  ansible.builtin.include_role:
-    name: osac.esi.l2
-    tasks_from: set_networks_for_node
-  vars:
-    node: "{{ item }}"
-    networks:
-    - "{{ cluster_infra_network_name }}"
-  loop: "{{ allocated_host_ids }}"
+- name: Remove cluster order label from agents not in HostLeases
+  kubernetes.core.k8s_json_patch:
+    api_version: agent-install.openshift.io/v1beta1
+    kind: Agent
+    name: "{{ agent.metadata.name }}"
+    namespace: "{{ agent.metadata.namespace }}"
+    patch:
+      - op: remove
+        path: /metadata/labels/{{ cluster_order_label | osac.service.json_pointer_escape }}
+      - op: add
+        path: /spec/approved
+        value: false
+  loop: "{{ agents_to_detach }}"
   loop_control:
-    label: "Attach host {{ item }}"
+    loop_var: agent
+    label: "Removing label from agent {{ agent.metadata.name }}"
 
 - name: Label selected agents with cluster order
   kubernetes.core.k8s_json_patch:

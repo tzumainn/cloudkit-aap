@@ -15,7 +15,7 @@
 
 - name: Detach node from private network
   ansible.builtin.include_role:
-    name: massopencloud.esi.l2
+    name: osac.esi.l2
     tasks_from: set_networks_for_node
   vars:
     node: "{{ host_lease.spec.externalHostID }}"
@@ -23,7 +23,7 @@
 
 - name: Attach node to network after detach
   ansible.builtin.include_role:
-    name: massopencloud.esi.l2
+    name: osac.esi.l2
     tasks_from: set_networks_for_node
   vars:
     node: "{{ host_lease.spec.externalHostID }}"
