@@ -22,6 +22,22 @@ argument_specs:
       manage_agents_skip_network_detach:
         type: bool
         default: false
+  import_agents:
+    options:
+      manage_agents_host_sets:
+        type: list
+        required: true
+      manage_agents_namespace:
+        type: str
+        required: true
+  remove_agents:
+    options:
+      manage_agents_host_sets:
+        type: list
+        required: true
+      manage_agents_namespace:
+        type: str
+        required: true
   select_and_label_new_agents:
     options:
       manage_agents_desired_count:
@@ -48,19 +64,4 @@ argument_specs:
     options:
       manage_agents_cluster_order_name:
         type: str
-        required: true
-  import_agents:
-    options:
-      manage_agents_node_names:
-        type: list
-        elements: str
-        required: true
-      manage_agents_idle_agents_network:
-        type: str
-        required: true
-  remove_agents:
-    options:
-      manage_agents_node_names:
-        type: list
-        elements: str
         required: true

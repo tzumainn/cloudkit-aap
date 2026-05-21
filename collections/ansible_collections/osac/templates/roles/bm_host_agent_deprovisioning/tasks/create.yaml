@@ -1,4 +1,68 @@
 ---
-- name: No-op for bm_host_agent_deprovisioning create
+- name: Fail if host class is not openstack
+  ansible.builtin.fail:
+    msg: "bm_host_agent_deprovisioning requires hostClass 'openstack', got '{{ bare_metal_instance.spec.hostClass | default('') }}'"
+  when: bare_metal_instance.spec.hostClass | default('') != "openstack"
+
+- name: Fail if network class is not openstack
+  ansible.builtin.fail:
+    msg: "bm_host_agent_deprovisioning requires networkClass 'openstack', got '{{ bare_metal_instance.spec.networkClass | default('') }}'"
+  when: bare_metal_instance.spec.networkClass | default('') != "openstack"
+
+- name: Get bare metal port information
+  openstack.cloud.baremetal_port_info:
+    node: "{{ bare_metal_instance.spec.externalHostID }}"
+  register: baremetal_port_result
+
+- name: Fail if no bare metal ports were found for node
+  ansible.builtin.fail:
+    msg: "No bare metal ports found for node '{{ bare_metal_instance.spec.externalHostID }}'"
+  when: baremetal_port_result.baremetal_ports | length == 0
+
+- name: Get agents
+  kubernetes.core.k8s_info:
+    kind: Agent
+    api_version: agent-install.openshift.io/v1beta1
+    namespace: "{{ bm_host_agent_deprovisioning_agents_namespace }}"
+  register: agents_result
+
+- name: Extract agents
+  ansible.builtin.set_fact:
+    current_agents: "{{ agents_result.resources }}"
+
+- name: Set agent name
+  ansible.builtin.set_fact:
+    agent_name: >-
+      {{
+        baremetal_port_result.baremetal_ports |
+        map(attribute='address') |
+        osac.service.mac_to_agent_name(current_agents)
+      }}
+
+- name: Delete agent for node
+  when: agent_name is not none
+  kubernetes.core.k8s:
+    kind: Agent
+    api_version: agent-install.openshift.io/v1beta1
+    namespace: "{{ bm_host_agent_deprovisioning_agents_namespace }}"
+    name: "{{ agent_name }}"
+    state: absent
+
+- name: Detach all networks and delete neutron ports
+  ansible.builtin.include_role:
+    name: osac.esi.l2
+    tasks_from: set_networks_for_node
+  vars:
+    node: "{{ bare_metal_instance.spec.externalHostID }}"
+    networks: []
+
+- name: Undeploy bare metal node
+  openstack.cloud.baremetal_node_action:
+    name: "{{ bare_metal_instance.spec.externalHostID }}"
+    state: absent
+    deploy: false
+    wait: true
+
+- name: Image deprovisioning initiated
   ansible.builtin.debug:
-    msg: "bm_host_agent_deprovisioning does not handle creation"
+    msg: "Image deprovisioning initiated for node {{ bare_metal_instance.spec.externalHostID }}"

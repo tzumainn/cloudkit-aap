@@ -23,6 +23,16 @@
     msg: "Bare metal node '{{ bare_metal_instance.spec.externalHostID }}' not found in OpenStack"
   when: baremetal_node_result.nodes | length == 0
 
+- name: Get bare metal port information
+  openstack.cloud.baremetal_port_info:
+    node: "{{ bare_metal_instance.spec.externalHostID }}"
+  register: baremetal_port_result
+
+- name: Fail if no bare metal ports were found for node
+  ansible.builtin.fail:
+    msg: "No bare metal ports found for node '{{ bare_metal_instance.spec.externalHostID }}'"
+  when: baremetal_port_result.baremetal_ports | length == 0
+
 - name: Extract node info
   ansible.builtin.set_fact:
     node_info: "{{ baremetal_node_result.nodes[0] }}"
@@ -87,7 +97,7 @@
 
     - name: Set provisioning network for node
       ansible.builtin.include_role:
-        name: massopencloud.esi.l2
+        name: osac.esi.l2
         tasks_from: set_networks_for_node
       vars:
         node: "{{ bare_metal_instance.spec.externalHostID }}"
@@ -111,9 +121,43 @@
         deploy: true
         wait: true
 
+- name: Wait for node to register as agent
+  kubernetes.core.k8s_info:
+    kind: Agent
+    api_version: agent-install.openshift.io/v1beta1
+    namespace: "{{ bm_host_agent_provisioning_agents_namespace }}"
+  register: current_agents
+  until: >
+    baremetal_port_result.baremetal_ports |
+    map(attribute='address') |
+    osac.service.mac_to_agent_name(current_agents.resources) is not none
+  retries: 90
+  delay: 10
+
+- name: Find agent
+  ansible.builtin.set_fact:
+    agent_name: "{{ baremetal_port_result.baremetal_ports | map(attribute='address') | osac.service.mac_to_agent_name(current_agents.resources) }}"
+
+- name: Configure agent metadata
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: agent-install.openshift.io/v1beta1
+      kind: Agent
+      metadata:
+        name: "{{ agent_name }}"
+        namespace: "{{ bm_host_agent_provisioning_agents_namespace }}"
+        annotations:
+          "osac.openshift.io/host_uuid": "{{ node_info.id }}"
+        labels:
+          "osac.openshift.io/resource_class": "{{ node_info.resource_class }}"
+      spec:
+        approved: true
+        hostname: "{{ node_info.name | lower }}"
+
 - name: Ensure node is on agent private network
   ansible.builtin.include_role:
-    name: massopencloud.esi.l2
+    name: osac.esi.l2
     tasks_from: set_networks_for_node
   vars:
     node: "{{ bare_metal_instance.spec.externalHostID }}"

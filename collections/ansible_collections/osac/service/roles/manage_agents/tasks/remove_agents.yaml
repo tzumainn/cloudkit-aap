@@ -1,51 +1,35 @@
-- name: Display node names that will be removed from being agents
-  ansible.builtin.debug:
-    var: manage_agents_node_names
-
-- name: Get agents
-  kubernetes.core.k8s_info:
-    kind: Agent
-    api_version: agent-install.openshift.io/v1beta1
-    namespace: "{{ manage_agents_namespace }}"
-  register: agents_result
-
-- name: Extract agents
-  ansible.builtin.set_fact:
-    initial_agents: "{{ agents_result.resources }}"
-
-- name: Get node list for removal
-  ansible.builtin.include_role:
-    name: osac.esi.node
-    tasks_from: get_nodes
-  vars:
-    node_filter_names: "{{ manage_agents_node_names }}"
-# set_fact: node_info_list
-
-- name: Delete agents for each node
+- name: Create bare metal pool for agent deprovisioning
   kubernetes.core.k8s:
-    kind: Agent
-    api_version: agent-install.openshift.io/v1beta1
-    namespace: "{{ manage_agents_namespace }}"
-    name: >-
-      {{
-        node_info.ports |
-        map(attribute='address') |
-        osac.service.mac_to_agent_name(initial_agents)
-      }}
-    state: absent
-  loop: "{{ node_info_list }}"
-  loop_control:
-    loop_var: node_info
-    label: "{{ node_info.name }}"
+    state: present
+    definition:
+      apiVersion: osac.openshift.io/v1alpha1
+      kind: BareMetalPool
+      metadata:
+        name: "{{ manage_agents_deprovisioning_pool_name }}"
+        namespace: "{{ manage_agents_namespace }}"
+      spec:
+        hostSets: "{{ manage_agents_host_sets }}"
+        profile:
+          name: "{{ manage_agents_deprovisioning_profile }}"
 
-- name: Clean nodes
-  ansible.builtin.include_role:
-    name: osac.esi.node
-    tasks_from: clean_node
-  vars:
-    node_name: "{{ node_info.name }}"
-    node_clean_wait: true
-  loop: "{{ node_info_list }}"
-  loop_control:
-    loop_var: node_info
-    label: "{{ node_info.name }}"
+- name: Wait for bare metal pool to be ready
+  kubernetes.core.k8s_info:
+    kind: BareMetalPool
+    api_version: osac.openshift.io/v1alpha1
+    namespace: "{{ manage_agents_namespace }}"
+    name: "{{ manage_agents_deprovisioning_pool_name }}"
+  register: bmp_result
+  until: >
+    bmp_result.resources | length > 0 and
+    bmp_result.resources[0].status is defined and
+    bmp_result.resources[0].status.phase | default('') == "Ready"
+  retries: 120
+  delay: 15
+
+- name: Delete bare metal pool for agent deprovisioning
+  kubernetes.core.k8s:
+    state: absent
+    api_version: osac.openshift.io/v1alpha1
+    kind: BareMetalPool
+    name: "{{ manage_agents_deprovisioning_pool_name }}"
+    namespace: "{{ manage_agents_namespace }}"

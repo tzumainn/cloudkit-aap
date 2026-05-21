@@ -1,3 +1,8 @@
 manage_agents_provisioning_network_name: provisioning
-manage_agents_namespace: hardware-inventory
+manage_agents_idle_agents_network_name: idle-agents-network
+manage_agents_agent_namespace: hardware-inventory
 manage_agents_infraenv_name: hardware-inventory
+manage_agents_provisioning_pool_name: agent-provisioning-pool
+manage_agents_deprovisioning_pool_name: agent-deprovisioning-pool
+manage_agents_provisioning_profile: agentProvisioning
+manage_agents_deprovisioning_profile: agentDeprovisioning
