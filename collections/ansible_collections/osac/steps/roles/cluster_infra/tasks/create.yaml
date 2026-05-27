@@ -57,13 +57,13 @@
   until: >
     (
       hostleases_result.resources |
+      selectattr('spec.externalHostID', 'ne', '') |
       selectattr('metadata.ownerReferences', 'defined') |
       map(attribute='metadata.ownerReferences') |
       flatten |
       selectattr('controller', 'defined') |
       selectattr('controller', 'equalto', true) |
       selectattr('uid', 'equalto', baremetalpool_uid) |
-      selectattr('spec.externalHostID', 'ne', '') |
       list | length
     ) == (total_desired_nodes | int)
   retries: 60
